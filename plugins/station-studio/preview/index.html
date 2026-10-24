@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>استوديو المحطة — معاينة الواجهة</title>
+<meta name="description" content="Interactive mock-up of the Station Studio OBS plugin dock (Arabic, RTL).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #17181f; --panel: #22242d; --panel-2: #2b2e39; --line: #3a3e4c;
+    --text: #e8e9ee; --muted: #9a9fb0; --accent: #3b82f6; --live: #e5484d; --ok: #30a46c; --warn: #f5a524;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 "IBM Plex Sans Arabic", "Segoe UI", Tahoma, "Noto Sans Arabic", system-ui, sans-serif; }
+  button, select, input { font: inherit; color: inherit; }
+  .app { display: flex; flex-direction: column; height: 100%; }
+  .menubar { display: flex; gap: 18px; align-items: center; padding: 6px 14px; background: #101117; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .menubar strong { color: var(--text); }
+  .menubar .spacer { flex: 1; }
+  .langswitch button { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--muted); }
+  .langswitch button[aria-pressed="true"] { color: var(--text); border-color: var(--accent); }
+  .workspace { flex: 1; display: flex; gap: 10px; padding: 10px; min-height: 0; }
+  .program { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .canvas { flex: 1; background: #000; border: 1px solid var(--line); border-radius: 6px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 240px; }
+  .canvas .scene { text-align: center; }
+  .canvas .scene .big { font-size: 34px; font-weight: 700; }
+  .canvas .scene .small { color: var(--muted); }
+  .badge { position: absolute; inset-inline-start: 14px; top: 14px; background: var(--live); color: #fff; padding: 2px 10px; border-radius: 4px; font-weight: 700; font-size: 12px; letter-spacing: .5px; }
+  .badge.off { background: var(--panel-2); color: var(--muted); }
+  .controls { display: flex; gap: 8px; }
+  .controls .box { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; color: var(--muted); font-size: 12px; }
+  .controls .box b { display: block; color: var(--text); font-size: 13px; margin-bottom: 4px; }
+
+  .dock { width: 460px; flex-shrink: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; min-height: 0; }
+  .dock-title { padding: 6px 10px; border-bottom: 1px solid var(--line); font-weight: 600; font-size: 13px; background: var(--panel-2); border-radius: 6px 6px 0 0; }
+  .dock-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+  .onair { font-size: 17px; font-weight: 700; color: var(--live); }
+  .next, .mode { color: var(--muted); font-size: 13px; }
+  .warning { color: var(--warn); font-size: 12px; }
+  .btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.automation-on { background: #1c3a2b; border-color: var(--ok); }
+  .btn.automation-off { background: #3a1c1e; border-color: var(--live); }
+  .row { display: flex; gap: 6px; }
+  .row > .grow { flex: 1; }
+  select, input[type=text], input[type=number], input[type=time], input[type=date] { background: #1b1d25; border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; min-width: 0; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 12px; cursor: pointer; color: var(--muted); }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .tabpanel { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; padding-top: 8px; }
+  .tabpanel[hidden] { display: none; }
+
+  .grid-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 4px; flex: 3; min-height: 160px; }
+  table.week { border-collapse: collapse; width: 100%; font-size: 11px; table-layout: fixed; }
+  table.week th, table.week td { border: 1px solid #2f3240; padding: 2px 3px; height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  table.week thead th { position: sticky; top: 0; background: var(--panel-2); z-index: 1; font-weight: 600; }
+  table.week th.hour { width: 42px; color: var(--muted); background: var(--panel-2); font-weight: 400; }
+  table.week td { cursor: pointer; }
+  table.week td:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
+  table.week td.k0 { background: #23395e; } table.week td.k1 { background: #3d2a5c; } table.week td.k2 { background: #22463a; }
+  table.week td.k3 { background: #5a3a1e; } table.week td.k4 { background: #4a2433; }
+  table.week td.now { box-shadow: inset 0 0 0 2px var(--live); }
+  .tip { color: var(--muted); font-size: 12px; }
+  ul.list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 4px; overflow: auto; flex: 2; min-height: 90px; background: #1b1d25; }
+  ul.list li { padding: 5px 8px; border-bottom: 1px solid #2a2d38; cursor: pointer; font-size: 13px; }
+  ul.list li[aria-selected="true"] { background: #2a3d63; }
+  ul.list li.disabled { color: var(--muted); }
+  ul.list li.empty { color: var(--muted); cursor: default; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0; }
+  label.check { display: flex; gap: 8px; align-items: center; }
+
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 0; width: min(560px, 94vw); }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  .dlg-head { padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--panel-2); }
+  .dlg-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow: auto; }
+  .dlg-foot { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+  .form { display: grid; grid-template-columns: 130px 1fr; gap: 8px 10px; align-items: center; }
+  .days { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  legend { padding: 0 6px; font-weight: 600; }
+  .status { font-size: 12px; padding: 1px 8px; border-radius: 10px; background: var(--panel-2); color: var(--muted); }
+  .status.on { background: #1c3a2b; color: #7ee2a8; }
+  .error { color: var(--live); font-size: 12px; min-height: 1em; }
+  .note { font-size: 12px; color: var(--muted); padding: 6px 14px; background: #101117; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="menubar">
+    <strong>OBS Studio</strong>
+    <span data-t="m.file">ملف</span><span data-t="m.edit">تحرير</span><span data-t="m.docks">الأرصفة</span>
+    <button class="btn" id="openOutputs" style="padding:2px 10px" data-t="Menu.Outputs"></button>
+    <span class="spacer"></span>
+    <div class="langswitch" role="group" aria-label="Language">
+      <button type="button" data-lang="ar" aria-pressed="true">العربية</button>
+      <button type="button" data-lang="en" aria-pressed="false">English</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="program" aria-label="Program">
+      <div class="canvas">
+        <span class="badge" id="liveBadge">LIVE</span>
+        <div class="scene"><div class="big" id="sceneBig"></div><div class="small" id="sceneSmall"></div></div>
+      </div>
+      <div class="controls">
+        <div class="box"><b data-t="c.scenes">المشاهد</b><span id="sceneNames"></span></div>
+        <div class="box"><b data-t="c.outputs">المخرجات</b><span id="outSummary"></span></div>
+      </div>
+    </section>
+
+    <aside class="dock" aria-labelledby="dockTitle">
+      <div class="dock-title" id="dockTitle" data-t="Dock.Title"></div>
+      <div class="dock-body">
+        <div class="onair" id="onAir" aria-live="polite"></div>
+        <div class="next" id="next"></div>
+        <div class="mode" id="mode"></div>
+        <div class="warning" id="warning"></div>
+        <button class="btn" id="automation"></button>
+        <div class="row">
+          <select class="grow" id="takeList" aria-label="Manual take"></select>
+          <button class="btn" id="take" data-t="Dock.Take"></button>
+        </div>
+        <button class="btn" id="resume" data-t="Dock.Resume"></button>
+
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" aria-controls="p-week" id="t-week" data-t="Tab.Week"></button>
+          <button role="tab" aria-selected="false" aria-controls="p-day" id="t-day" data-t="Tab.Day"></button>
+          <button role="tab" aria-selected="false" aria-controls="p-settings" id="t-settings" data-t="Tab.Settings"></button>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="p-week" aria-labelledby="t-week">
+          <div class="grid-wrap"><table class="week" id="week"></table></div>
+          <div class="tip" data-t="Dock.WeekTip"></div>
+          <ul class="list" id="slotList" role="listbox" aria-label="Slots"></ul>
+          <div class="row">
+            <button class="btn" id="add" data-t="Dock.Add"></button>
+            <button class="btn" id="edit" data-t="Dock.Edit"></button>
+            <button class="btn" id="del" data-t="Dock.Delete"></button>
+          </div>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="p-day" aria-labelledby="t-day" hidden>
+          <input type="date" id="dayPick" aria-label="Date">
+          <ul class="list" id="dayList" aria-label="Day schedule"></ul>
+          <button class="btn" id="addOneOff" data-t="Dock.AddOneOff"></button>
+        </div>
+
+        <div class="tabpanel" role="tabpanel" id="p-settings" aria-labelledby="t-settings" hidden>
+          <label for="fallback" data-t="Settings.Fallback"></label>
+          <select id="fallback"></select>
+          <p class="hint" data-t="Settings.FallbackHint"></p>
+          <label class="check"><input type="checkbox" id="releaseManual" checked><span data-t="Settings.ReleaseManual"></span></label>
+          <label class="check"><input type="checkbox" id="radioMon"><span data-t="Settings.RadioMonitoring"></span></label>
+          <button class="btn" id="openOutputs2" data-t="Menu.Outputs"></button>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <div class="note" data-t="note"></div>
+</div>
+
+<dialog id="slotDlg" aria-labelledby="slotDlgTitle">
+  <form method="dialog" id="slotForm">
+    <div class="dlg-head" id="slotDlgTitle"></div>
+    <div class="dlg-body">
+      <div class="form">
+        <label for="fTitle" data-t="Slot.Title"></label><input type="text" id="fTitle">
+        <label for="fKind" data-t="Slot.Kind"></label><select id="fKind"></select>
+        <span></span><p class="hint" id="fHint"></p>
+        <label for="fTarget" data-t="Slot.Target"></label>
+        <div class="row"><input type="text" class="grow" id="fTarget"><button type="button" class="btn" data-t="Slot.Browse"></button></div>
+        <label for="fStart" data-t="Slot.Start"></label><input type="time" id="fStart">
+        <label for="fDur" data-t="Slot.Duration"></label>
+        <div class="row"><input type="number" id="fDur" min="1" max="1440" style="width:100px"><span data-t="Slot.Minutes"></span></div>
+        <span data-t="Slot.Days"></span><div class="days" id="fDays"></div>
+        <label class="check" style="grid-column:1"><input type="checkbox" id="fOneOffOn"><span data-t="Slot.OneOff"></span></label>
+        <input type="date" id="fOneOff">
+        <span></span><label class="check"><input type="checkbox" id="fLoop"><span data-t="Slot.Loop"></span></label>
+        <span></span><label class="check"><input type="checkbox" id="fEnabled" checked><span data-t="Slot.Enabled"></span></label>
+      </div>
+      <div class="error" id="fError" role="alert"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" id="fCancel" data-t="Cancel"></button>
+      <button type="button" class="btn primary" id="fSave" data-t="Save"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="outDlg" aria-labelledby="outDlgTitle">
+  <div class="dlg-head" id="outDlgTitle" data-t="Outputs.Title"></div>
+  <div class="dlg-body" id="outBody"></div>
+  <div class="dlg-foot"><button type="button" class="btn" id="outClose" data-t="Close"></button></div>
+</dialog>
+
+<script>
+const STR = {
+  ar: {
+    "Dock.Title":"استوديو المحطة","Menu.Outputs":"مخرجات المحطة (مستقبِل، ويب، يوتيوب، فيسبوك)",
+    "Tab.Week":"الجدول الأسبوعي","Tab.Day":"يوم محدد","Tab.Settings":"الإعدادات",
+    days:["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"],
+    kinds:["مشهد OBS","مصدر OBS (كاميرا، HDMI...)","ملف فيديو/صوت","بث شبكي (RTMP/SRT/HLS)","صفحة ويب / يوتيوب"],
+    hints:["ينتقل إلى مشهد جاهز في OBS، مثل مشهد الكاميرا أو الاستوديو.","يعرض مصدراً موجوداً (كاميرا، بطاقة HDMI، التقاط شاشة) بملء الشاشة.","يشغّل ملفاً محلياً. اختر التكرار لملء مدة الفترة.","رابط يقرؤه FFmpeg، مثل srt://... أو rtmp://... أو https://.../index.m3u8","رابط صفحة يُعرض عبر مصدر المتصفح، مثل رابط تضمين يوتيوب: https://www.youtube.com/embed/ID?autoplay=1"],
+    "Slot.NewTitle":"فترة جديدة","Slot.EditTitle":"تعديل الفترة","Slot.Title":"العنوان","Slot.Kind":"نوع المحتوى","Slot.Target":"المحتوى","Slot.Browse":"استعراض...","Slot.Start":"وقت البدء","Slot.Duration":"المدة","Slot.Minutes":"دقيقة","Slot.Days":"أيام التكرار","Slot.OneOff":"مرة واحدة في تاريخ:","Slot.Loop":"تكرار الملف حتى نهاية الفترة","Slot.Enabled":"مفعّلة","Slot.Disabled":"(معطّلة)",
+    Save:"حفظ",Cancel:"إلغاء",Close:"إغلاق",
+    "Dock.AutomationOn":"الأتمتة تعمل — اضغط للإيقاف","Dock.AutomationOff":"الأتمتة متوقفة — اضغط للتشغيل","Dock.Take":"بث يدوي","Dock.Resume":"العودة إلى الجدول","Dock.Add":"إضافة","Dock.Edit":"تعديل","Dock.Delete":"حذف","Dock.AddOneOff":"إضافة فترة لهذا اليوم فقط","Dock.WeekTip":"انقر نقراً مزدوجاً على خانة لإضافة فترة أو تعديلها","Dock.DayEmpty":"لا يوجد محتوى مجدول في هذا اليوم","Dock.ConfirmDelete":"حذف الفترة «%1»؟","Dock.OverlapWarning":"تنبيه: يوجد %1 تداخل في الجدول. الفترة التي تبدأ لاحقاً هي التي تُبث.",
+    "Mode.Off":"الوضع: يدوي بالكامل (الأتمتة متوقفة)","Mode.Auto":"الوضع: تلقائي حسب الجدول","Mode.Manual":"الوضع: تحكم يدوي مؤقت",
+    "Status.OnAir":"على الهواء: %1","Status.Next":"التالي %1: %2","Status.NextGap":"عند %1: لا يوجد محتوى (البديل)","Status.NothingNext":"لا يوجد محتوى قادم في الجدول","Status.Fallback":"المحتوى البديل",
+    "Settings.Fallback":"المشهد البديل (يُعرض في الفراغات وعند الأعطال):","Settings.FallbackHint":"ننصح بمشهد يحتوي شعار القناة أو فاصلاً متكرراً حتى لا تظهر شاشة سوداء أبداً.","Settings.NoFallback":"بدون — إبقاء ما هو معروض","Settings.ReleaseManual":"إنهاء التحكم اليدوي تلقائياً عند بداية الفترة التالية","Settings.RadioMonitoring":"سماع الصوت المجدول على السماعات (مفيد للراديو)",
+    "Outputs.Title":"مخرجات المحطة","Outputs.Intro":"هذه المخرجات تعمل بالتوازي مع أزرار البث والتسجيل في OBS، وكلها تنقل نفس ما يظهر على الهواء.","Outputs.Quality":"الجودة","Outputs.VideoBitrate":"معدل الفيديو","Outputs.AudioBitrate":"معدل الصوت","Outputs.Receiver":"إرسال إلى جهاز استقبال / رأس بث (SRT أو UDP)","Outputs.ReceiverHint":"الوضع الافتراضي يستمع على المنفذ 9000، ويتصل به جهاز الاستقبال: srt://عنوان-هذا-الجهاز:9000. أو أدخل udp://239.0.0.1:1234 للبث المتعدد.","Outputs.Url":"الرابط","Outputs.Web":"البث على موقع الويب (HLS)","Outputs.Folder":"مجلد الملفات","Outputs.Port":"منفذ الخادم","Outputs.PlayerUrl":"رابط المشغّل","Outputs.WebHint":"افتح رابط المشغّل في المتصفح، أو ضعه داخل موقعك عبر iframe.","Outputs.YouTube":"يوتيوب مباشر","Outputs.Facebook":"فيسبوك مباشر","Outputs.Server":"الخادم","Outputs.Key":"مفتاح البث","Outputs.Running":"يعمل","Outputs.Stopped":"متوقف","Outputs.Start":"تشغيل","Outputs.Stop":"إيقاف",
+    "Error.MissingTarget":"يرجى تحديد المحتوى.","Error.NoWeekdays":"يرجى اختيار يوم واحد على الأقل أو تاريخ محدد.",
+    "m.file":"ملف","m.edit":"تحرير","m.docks":"الأرصفة","c.scenes":"المشاهد","c.outputs":"المخرجات النشطة",
+    noOutputs:"لا توجد مخرجات إضافية تعمل",
+    note:"معاينة تفاعلية لواجهة الإضافة بالبيانات التجريبية — الإضافة الفعلية مكتوبة بـ C++/Qt وتعمل داخل OBS. الوقت الحالي محاكى."
+  },
+  en: {
+    "Dock.Title":"Station Studio","Menu.Outputs":"Station outputs (receiver, web, YouTube, Facebook)",
+    "Tab.Week":"Weekly schedule","Tab.Day":"Specific day","Tab.Settings":"Settings",
+    days:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+    kinds:["OBS scene","OBS source (camera, HDMI...)","Video/audio file","Network stream (RTMP/SRT/HLS)","Web page / YouTube"],
+    hints:["Switches to a ready-made OBS scene, such as a camera or studio scene.","Shows an existing source (camera, HDMI card, screen capture) full screen.","Plays a local file. Enable loop to fill the slot.","A URL FFmpeg can read, e.g. srt://..., rtmp://... or https://.../index.m3u8","A page shown via the browser source, e.g. https://www.youtube.com/embed/ID?autoplay=1"],
+    "Slot.NewTitle":"New slot","Slot.EditTitle":"Edit slot","Slot.Title":"Title","Slot.Kind":"Content type","Slot.Target":"Content","Slot.Browse":"Browse...","Slot.Start":"Start time","Slot.Duration":"Duration","Slot.Minutes":"min","Slot.Days":"Repeat on","Slot.OneOff":"Once on date:","Slot.Loop":"Loop file until slot ends","Slot.Enabled":"Enabled","Slot.Disabled":"(disabled)",
+    Save:"Save",Cancel:"Cancel",Close:"Close",
+    "Dock.AutomationOn":"Automation running — click to stop","Dock.AutomationOff":"Automation stopped — click to start","Dock.Take":"Take live","Dock.Resume":"Back to schedule","Dock.Add":"Add","Dock.Edit":"Edit","Dock.Delete":"Delete","Dock.AddOneOff":"Add slot for this day only","Dock.WeekTip":"Double-click a cell to add or edit a slot","Dock.DayEmpty":"Nothing scheduled on this day","Dock.ConfirmDelete":"Delete slot \"%1\"?","Dock.OverlapWarning":"Warning: %1 overlap(s) in the schedule. The later-starting slot wins.",
+    "Mode.Off":"Mode: fully manual (automation off)","Mode.Auto":"Mode: automatic from schedule","Mode.Manual":"Mode: temporary manual override",
+    "Status.OnAir":"On air: %1","Status.Next":"Next %1: %2","Status.NextGap":"At %1: nothing scheduled (fallback)","Status.NothingNext":"Nothing upcoming","Status.Fallback":"Fallback content",
+    "Settings.Fallback":"Fallback scene (shown in gaps and on errors):","Settings.FallbackHint":"Use a scene with the channel logo or a loop so the screen never goes black.","Settings.NoFallback":"None — keep what is showing","Settings.ReleaseManual":"End manual override at the next slot start","Settings.RadioMonitoring":"Monitor scheduled audio on speakers (useful for radio)",
+    "Outputs.Title":"Station outputs","Outputs.Intro":"These run alongside OBS's Stream/Record buttons and all carry what is on air.","Outputs.Quality":"Quality","Outputs.VideoBitrate":"Video bitrate","Outputs.AudioBitrate":"Audio bitrate","Outputs.Receiver":"Send to receiver / headend (SRT or UDP)","Outputs.ReceiverHint":"Default listens on port 9000; the receiver connects to srt://this-machine:9000. Or use udp://239.0.0.1:1234 for multicast.","Outputs.Url":"URL","Outputs.Web":"Website stream (HLS)","Outputs.Folder":"Output folder","Outputs.Port":"Server port","Outputs.PlayerUrl":"Player URL","Outputs.WebHint":"Open the player URL in a browser or embed it in your site with an iframe.","Outputs.YouTube":"YouTube Live","Outputs.Facebook":"Facebook Live","Outputs.Server":"Server","Outputs.Key":"Stream key","Outputs.Running":"Running","Outputs.Stopped":"Stopped","Outputs.Start":"Start","Outputs.Stop":"Stop",
+    "Error.MissingTarget":"Please set the content.","Error.NoWeekdays":"Pick at least one day or a specific date.",
+    "m.file":"File","m.edit":"Edit","m.docks":"Docks","c.scenes":"Scenes","c.outputs":"Active outputs",
+    noOutputs:"No extra outputs running",
+    note:"Interactive mock-up of the plugin UI with sample data — the real plugin is C++/Qt and runs inside OBS. Current time is simulated."
+  }
+};
+let lang = "ar";
+const T = (k, ...a) => { let s = STR[lang][k] ?? k; a.forEach((v, i) => s = s.replace("%" + (i + 1), v)); return s; };
+
+const SCENES = ["الاستوديو", "الكاميرا الرئيسية", "شعار القناة", "الفواصل"];
+let nextId = 1;
+const mk = (title, kind, target, start, dur, days, extra = {}) => ({ id: nextId++, title, kind, target, start, dur, days, oneOff: null, loop: kind === 2, enabled: true, ...extra });
+let slots = [
+  mk("القرآن الكريم", 2, "D:/media/quran.mp4", 360, 60, [0,1,2,3,4,5,6]),
+  mk("برنامج الصباح", 0, "الاستوديو", 420, 120, [0,1,2,3,4]),
+  mk("نشرة الأخبار", 3, "srt://news.example:9000", 720, 30, [0,1,2,3,4,5,6]),
+  mk("خطبة الجمعة", 1, "كاميرا HDMI", 750, 60, [5]),
+  mk("وثائقي", 2, "D:/media/doc.mp4", 900, 90, [0,2,4], { loop: false }),
+  mk("بث يوتيوب مباشر", 4, "https://www.youtube.com/embed/live?autoplay=1", 1200, 60, [6]),
+  mk("نشرة المساء", 3, "srt://news.example:9000", 1260, 30, [0,1,2,3,4,5,6]),
+  mk("برنامج الصباح (مكرر)", 0, "الاستوديو", 480, 60, [1], { enabled: false }),
+];
+const state = { automation: true, manual: null, fallback: "شعار القناة", selected: null, now: simNow(),
+  outputs: { receiver: { on: true, url: "srt://0.0.0.0:9000?mode=listener" }, web: { on: false, folder: "C:/station/hls", port: 8090 },
+             youtube: { on: false, server: "rtmp://a.rtmp.youtube.com/live2", key: "" }, facebook: { on: false, server: "rtmps://live-api-s.facebook.com:443/rtmp/", key: "" },
+             vbr: 4500, abr: 160 } };
+
+function simNow() { const d = new Date(); d.setHours(12, 10, 0, 0); return d; }
+const fmt = m => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+const ymd = d => d.toISOString().slice(0, 10);
+const occursOn = (s, d) => s.enabled && (s.oneOff ? s.oneOff === ymd(d) : s.days.includes(d.getDay()));
+
+function activeAt(d) {
+  const m = d.getHours() * 60 + d.getMinutes();
+  let best = null;
+  for (const s of slots) if (occursOn(s, d) && m >= s.start && m < s.start + s.dur && (!best || s.start > best.start)) best = s;
+  return best;
+}
+function nextAfter(d) {
+  const m = d.getHours() * 60 + d.getMinutes();
+  const today = slots.filter(s => occursOn(s, d) && s.start > m).sort((a, b) => a.start - b.start);
+  return today[0] || null;
+}
+function overlaps() {
+  let n = 0;
+  for (let day = 0; day < 7; day++) {
+    const list = slots.filter(s => s.enabled && !s.oneOff && s.days.includes(day)).sort((a, b) => a.start - b.start);
+    for (let i = 1; i < list.length; i++) if (list[i].start < list[i - 1].start + list[i - 1].dur) n++;
+  }
+  return n;
+}
+
+function renderStatus() {
+  const cur = !state.automation ? null : state.manual ? { title: state.manual } : activeAt(state.now);
+  const showing = cur ? cur.title : T("Status.Fallback");
+  $("onAir").textContent = T("Status.OnAir", showing);
+  const nx = nextAfter(state.now);
+  $("next").textContent = nx ? T("Status.Next", fmt(nx.start), nx.title) : T("Status.NothingNext");
+  $("mode").textContent = !state.automation ? T("Mode.Off") : state.manual ? T("Mode.Manual") : T("Mode.Auto");
+  const o = overlaps(); $("warning").textContent = o ? T("Dock.OverlapWarning", o) : "";
+  const a = $("automation");
+  a.textContent = state.automation ? T("Dock.AutomationOn") : T("Dock.AutomationOff");
+  a.className = "btn " + (state.automation ? "automation-on" : "automation-off");
+  $("resume").disabled = !state.manual;
+  $("sceneBig").textContent = cur ? cur.title : (state.fallback || "—");
+  $("sceneSmall").textContent = cur && cur.kind != null ? STR[lang].kinds[cur.kind] + " · " + cur.target : T("Status.Fallback");
+  const running = Object.entries(state.outputs).filter(([, v]) => v && v.on).map(([k]) => ({ receiver: "SRT", web: "HLS", youtube: "YouTube", facebook: "Facebook" })[k]);
+  $("outSummary").textContent = running.length ? running.join(" · ") : T("noOutputs");
+  $("liveBadge").className = "badge" + (running.length ? "" : " off");
+  $("sceneNames").textContent = SCENES.join(" · ");
+}
+
+function renderWeek() {
+  const tbl = $("week"), D = STR[lang].days;
+  let h = "<thead><tr><th class='hour'></th>" + D.map(d => `<th scope="col">${d}</th>`).join("") + "</tr></thead><tbody>";
+  const nowDay = state.now.getDay(), nowH = state.now.getHours();
+  for (let hr = 0; hr < 24; hr++) {
+    h += `<tr><th class="hour" scope="row">${fmt(hr * 60)}</th>`;
+    for (let d = 0; d < 7; d++) {
+      let hit = null;
+      for (const s of slots) if (s.enabled && !s.oneOff && s.days.includes(d) && s.start < (hr + 1) * 60 && s.start + s.dur > hr * 60 && (!hit || s.start > hit.start)) hit = s;
+      const cls = (hit ? "k" + hit.kind : "") + (d === nowDay && hr === nowH ? " now" : "");
+      h += `<td class="${cls}" data-day="${d}" data-hour="${hr}" data-id="${hit ? hit.id : ""}" title="${hit ? hit.title : ""}">${hit ? hit.title : ""}</td>`;
+    }
+    h += "</tr>";
+  }
+  tbl.innerHTML = h + "</tbody>";
+}
+
+function slotLine(s) {
+  const D = STR[lang].days;
+  const when = s.oneOff ? s.oneOff : s.days.length === 7 ? (lang === "ar" ? "كل يوم" : "Every day") : s.days.map(d => D[d]).join("، ");
+  return `${fmt(s.start)}–${fmt(s.start + s.dur)}  ${s.title}  [${STR[lang].kinds[s.kind]}]  · ${when}${s.enabled ? "" : " " + T("Slot.Disabled")}`;
+}
+function renderList() {
+  const ul = $("slotList");
+  ul.innerHTML = slots.slice().sort((a, b) => a.start - b.start).map(s =>
+    `<li role="option" data-id="${s.id}" aria-selected="${state.selected === s.id}" class="${s.enabled ? "" : "disabled"}">${slotLine(s)}</li>`).join("");
+}
+function renderDay() {
+  const d = new Date($("dayPick").value + "T00:00");
+  const list = slots.filter(s => occursOn(s, d)).sort((a, b) => a.start - b.start);
+  $("dayList").innerHTML = list.length ? list.map(s => `<li data-id="${s.id}">${fmt(s.start)}–${fmt(s.start + s.dur)}  ${s.title}</li>`).join("")
+    : `<li class="empty">${T("Dock.DayEmpty")}</li>`;
+}
+function renderTake() {
+  $("takeList").innerHTML = SCENES.map(s => `<option>${s}</option>`).join("");
+  $("fallback").innerHTML = `<option value="">${T("Settings.NoFallback")}</option>` + SCENES.map(s => `<option ${s === state.fallback ? "selected" : ""}>${s}</option>`).join("");
+}
+function applyStatic() {
+  document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.title = T("Dock.Title");
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = T(el.dataset.t));
+  document.querySelectorAll(".langswitch button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+}
+function renderAll() { applyStatic(); renderTake(); renderStatus(); renderWeek(); renderList(); renderDay(); }
+const $ = id => document.getElementById(id);
+
+// Slot dialog
+let editing = null;
+function openSlot(slot, preset = {}) {
+  editing = slot;
+  const s = slot || { title: "", kind: 0, target: "", start: 0, dur: 60, days: [], oneOff: null, loop: false, enabled: true, ...preset };
+  $("slotDlgTitle").textContent = slot ? T("Slot.EditTitle") : T("Slot.NewTitle");
+  $("fTitle").value = s.title; $("fTitle").placeholder = lang === "ar" ? "مثال: نشرة الأخبار" : "e.g. Evening news";
+  $("fKind").innerHTML = STR[lang].kinds.map((k, i) => `<option value="${i}" ${i === s.kind ? "selected" : ""}>${k}</option>`).join("");
+  $("fHint").textContent = STR[lang].hints[s.kind];
+  $("fTarget").value = s.target; $("fStart").value = fmt(s.start); $("fDur").value = s.dur;
+  $("fDays").innerHTML = STR[lang].days.map((d, i) => `<label class="check"><input type="checkbox" value="${i}" ${s.days.includes(i) ? "checked" : ""}>${d}</label>`).join("");
+  $("fOneOffOn").checked = !!s.oneOff; $("fOneOff").value = s.oneOff || ymd(state.now);
+  $("fLoop").checked = s.loop; $("fEnabled").checked = s.enabled; $("fError").textContent = "";
+  $("slotDlg").showModal();
+}
+$("fKind").onchange = e => $("fHint").textContent = STR[lang].hints[+e.target.value];
+$("fCancel").onclick = () => $("slotDlg").close();
+$("fSave").onclick = () => {
+  const days = [...$("fDays").querySelectorAll("input:checked")].map(i => +i.value);
+  const oneOff = $("fOneOffOn").checked ? $("fOneOff").value : null;
+  if (!$("fTarget").value.trim()) return $("fError").textContent = T("Error.MissingTarget");
+  if (!days.length && !oneOff) return $("fError").textContent = T("Error.NoWeekdays");
+  const [hh, mm] = $("fStart").value.split(":").map(Number);
+  const data = { title: $("fTitle").value.trim() || $("fTarget").value.trim(), kind: +$("fKind").value, target: $("fTarget").value.trim(),
+    start: hh * 60 + mm, dur: Math.max(1, +$("fDur").value || 60), days, oneOff, loop: $("fLoop").checked, enabled: $("fEnabled").checked };
+  if (editing) Object.assign(editing, data); else { slots.push({ id: nextId++, ...data }); }
+  $("slotDlg").close(); renderAll();
+};
+
+// Outputs dialog
+function renderOutputs() {
+  const o = state.outputs;
+  const sec = (key, title, fields, hint) => `
+    <fieldset><legend>${title}</legend>${fields}${hint ? `<p class="hint">${hint}</p>` : ""}
+      <div class="row" style="align-items:center"><span class="status ${o[key].on ? "on" : ""}">${o[key].on ? T("Outputs.Running") : T("Outputs.Stopped")}</span>
+      <span class="grow"></span><button class="btn ${o[key].on ? "" : "primary"}" data-toggle="${key}">${o[key].on ? T("Outputs.Stop") : T("Outputs.Start")}</button></div>
+    </fieldset>`;
+  const f = (label, val, type = "text") => `<div class="form"><span>${label}</span><input type="${type}" value="${val}" dir="ltr"></div>`;
+  $("outBody").innerHTML = `<p class="hint">${T("Outputs.Intro")}</p>
+    <fieldset><legend>${T("Outputs.Quality")}</legend>${f(T("Outputs.VideoBitrate") + " (kbps)", o.vbr, "number")}${f(T("Outputs.AudioBitrate") + " (kbps)", o.abr, "number")}</fieldset>
+    ${sec("receiver", T("Outputs.Receiver"), f(T("Outputs.Url"), o.receiver.url), T("Outputs.ReceiverHint"))}
+    ${sec("web", T("Outputs.Web"), f(T("Outputs.Folder"), o.web.folder) + f(T("Outputs.Port"), o.web.port, "number") + f(T("Outputs.PlayerUrl"), "http://localhost:" + o.web.port + "/"), T("Outputs.WebHint"))}
+    ${sec("youtube", T("Outputs.YouTube"), f(T("Outputs.Server"), o.youtube.server) + f(T("Outputs.Key"), "", "password"))}
+    ${sec("facebook", T("Outputs.Facebook"), f(T("Outputs.Server"), o.facebook.server) + f(T("Outputs.Key"), "", "password"))}`;
+}
+$("outBody").onclick = e => { const k = e.target.dataset.toggle; if (k) { state.outputs[k].on = !state.outputs[k].on; renderOutputs(); renderStatus(); } };
+const openOut = () => { renderOutputs(); $("outDlg").showModal(); };
+$("openOutputs").onclick = openOut; $("openOutputs2").onclick = openOut;
+$("outClose").onclick = () => $("outDlg").close();
+
+// Dock interactions
+$("automation").onclick = () => { state.automation = !state.automation; if (!state.automation) state.manual = null; renderStatus(); };
+$("take").onclick = () => { state.manual = $("takeList").value; state.automation = true; renderStatus(); };
+$("resume").onclick = () => { state.manual = null; renderStatus(); };
+$("fallback").onchange = e => { state.fallback = e.target.value; renderStatus(); };
+$("slotList").onclick = e => { const li = e.target.closest("li"); if (li) { state.selected = +li.dataset.id; renderList(); } };
+$("slotList").ondblclick = e => { const li = e.target.closest("li"); if (li) openSlot(slots.find(s => s.id === +li.dataset.id)); };
+$("add").onclick = () => openSlot(null, { days: [state.now.getDay()], start: state.now.getHours() * 60 });
+$("edit").onclick = () => { const s = slots.find(x => x.id === state.selected); if (s) openSlot(s); };
+$("del").onclick = () => { const s = slots.find(x => x.id === state.selected); if (s && confirm(T("Dock.ConfirmDelete", s.title))) { slots = slots.filter(x => x !== s); state.selected = null; renderAll(); } };
+$("week").ondblclick = e => { const td = e.target.closest("td"); if (!td) return;
+  const s = slots.find(x => x.id === +td.dataset.id);
+  s ? openSlot(s) : openSlot(null, { days: [+td.dataset.day], start: +td.dataset.hour * 60 }); };
+$("dayPick").value = ymd(state.now); $("dayPick").onchange = renderDay;
+$("addOneOff").onclick = () => openSlot(null, { oneOff: $("dayPick").value, start: 600 });
+document.querySelectorAll('[role="tab"]').forEach(tab => tab.onclick = () => {
+  document.querySelectorAll('[role="tab"]').forEach(t => { const on = t === tab; t.setAttribute("aria-selected", on); $(t.getAttribute("aria-controls")).hidden = !on; });
+});
+document.querySelectorAll(".langswitch button").forEach(b => b.onclick = () => { lang = b.dataset.lang; renderAll(); });
+
+setInterval(() => { state.now = new Date(state.now.getTime() + 60000); renderStatus(); }, 2000);
+renderAll();
+</script>
+</body>
+</html>
