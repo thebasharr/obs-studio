@@ -1138,6 +1138,15 @@ void OBSApp::AppInit()
 	if (!InitLocale()) {
 		throw "Failed to load locale";
 	}
+
+	// OBS uses its own text lookup instead of QTranslator, so Qt never learns
+	// the UI language direction. Without this, Arabic (and other RTL locales)
+	// render in a left-to-right layout.
+	if (QLocale(QString::fromStdString(locale).replace('-', '_')).textDirection() == Qt::RightToLeft) {
+		blog(LOG_INFO, "Locale '%s' is right-to-left, enabling RTL layout", locale.c_str());
+		setLayoutDirection(Qt::RightToLeft);
+	}
+
 	if (!InitTheme()) {
 		throw "Failed to load theme";
 	}

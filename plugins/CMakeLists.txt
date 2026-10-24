@@ -83,6 +83,11 @@ add_core_module(mac-syphon PLATFORMS MACOS)
 add_core_module(mac-videotoolbox PLATFORMS MACOS)
 add_core_module(mac-virtualcam PLATFORMS MACOS)
 add_core_module(nv-filters PLATFORMS WINDOWS)
+add_core_module(
+    station-studio
+    PLATFORMS WINDOWS MACOS LINUX
+    WITH_MESSAGE
+)
 
 check_obs_browser()
 
