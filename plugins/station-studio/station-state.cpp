@@ -37,12 +37,14 @@ static bool GetBool(obs_data_t *d, const char *key, bool def)
 bool LoadState(Schedule &schedule, StationSettings &s)
 {
 	const std::string path = ConfigFile();
-	if (path.empty())
+	if (path.empty()) {
 		return false;
+	}
 
 	OBSDataAutoRelease root = obs_data_create_from_json_file_safe(path.c_str(), "bak");
-	if (!root)
+	if (!root) {
 		return false;
+	}
 
 	schedule.entries.clear();
 	OBSDataArrayAutoRelease slotArray = obs_data_get_array(root, "slots");
@@ -56,15 +58,17 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 		slot.durationMinutes = (int)obs_data_get_int(item, "duration_minutes");
 		slot.weekdays = (uint8_t)(obs_data_get_int(item, "weekdays") & kEveryDay);
 		const char *date = obs_data_get_string(item, "date");
-		if (date && *date)
+		if (date && *date) {
 			slot.date = ParseDate(date);
+		}
 		const int kind = (int)obs_data_get_int(item, "kind");
 		slot.kind = (kind >= 0 && kind < kSlotKindCount) ? (SlotKind)kind : SlotKind::Scene;
 		slot.target = obs_data_get_string(item, "target");
 		slot.loop = GetBool(item, "loop", true);
 		slot.enabled = GetBool(item, "enabled", true);
-		if (slot.id.empty())
+		if (slot.id.empty()) {
 			slot.id = schedule.GenerateId();
+		}
 		schedule.entries.push_back(std::move(slot));
 	}
 
@@ -89,8 +93,9 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 bool SaveState(const Schedule &schedule, const StationSettings &s)
 {
 	const std::string path = ConfigFile();
-	if (path.empty())
+	if (path.empty()) {
 		return false;
+	}
 
 	OBSDataAutoRelease root = obs_data_create();
 	OBSDataArrayAutoRelease slotArray = obs_data_array_create();

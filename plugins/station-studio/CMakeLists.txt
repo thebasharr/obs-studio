@@ -27,6 +27,7 @@ target_sources(
     station-dock.hpp
     station-state.cpp
     station-state.hpp
+    ui-common.hpp
 )
 
 target_include_directories(station-studio PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

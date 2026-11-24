@@ -1,4 +1,5 @@
 #include "outputs-manager.hpp"
+#include "ui-common.hpp"
 #include "hls-server.hpp"
 
 #include <obs-module.h>
@@ -8,11 +9,6 @@
 #include <QNetworkInterface>
 
 namespace station {
-
-static QString T(const char *key)
-{
-	return QString::fromUtf8(obs_module_text(key));
-}
 
 OutputsManager::OutputsManager() = default;
 
@@ -56,8 +52,9 @@ QString OutputsManager::LastError(Target target) const
 static int GopFrames()
 {
 	obs_video_info ovi;
-	if (!obs_get_video_info(&ovi) || ovi.fps_den == 0)
+	if (!obs_get_video_info(&ovi) || ovi.fps_den == 0) {
 		return 60;
+	}
 	return (int)(2 * ovi.fps_num / ovi.fps_den); /* 2 second keyframes */
 }
 
@@ -81,8 +78,9 @@ bool OutputsManager::StartFfmpeg(Target target, const StationSettings &s, QStrin
 			return false;
 		}
 		/* Stale segments from an earlier run would confuse players. */
-		for (const QString &f : dir.entryList({"live*.ts", "live.m3u8"}, QDir::Files))
+		for (const QString &f : dir.entryList({"live*.ts", "live.m3u8"}, QDir::Files)) {
 			dir.remove(f);
+		}
 		url = dir.filePath("live.m3u8").toStdString();
 		obs_data_set_string(settings, "format_name", "hls");
 		obs_data_set_string(settings, "muxer_settings",
@@ -119,8 +117,9 @@ bool OutputsManager::StartFfmpeg(Target target, const StationSettings &s, QStrin
 	Slot(target) = output.Get();
 
 	if (target == Target::Web) {
-		if (!hlsServer_)
+		if (!hlsServer_) {
 			hlsServer_ = std::make_unique<HlsServer>();
+		}
 		char *playerDir = obs_module_file("player");
 		const QString playerFolder = QString::fromUtf8(playerDir ? playerDir : "");
 		bfree(playerDir);
@@ -138,8 +137,9 @@ bool OutputsManager::EnsureSharedEncoders(const StationSettings &s, QString &err
 {
 	/* YouTube and Facebook share one encoder pair: one encode, two uploads. */
 	if (videoEncoder_ && audioEncoder_) {
-		if (obs_encoder_active(videoEncoder_))
+		if (obs_encoder_active(videoEncoder_)) {
 			return true;
+		}
 		OBSDataAutoRelease vs = obs_encoder_get_settings(videoEncoder_);
 		obs_data_set_int(vs, "bitrate", s.videoKbps);
 		obs_encoder_update(videoEncoder_, vs);
@@ -159,7 +159,8 @@ bool OutputsManager::EnsureSharedEncoders(const StationSettings &s, QString &err
 	OBSEncoderAutoRelease venc = obs_video_encoder_create("obs_x264", "station-multistream-video", vs, nullptr);
 	OBSDataAutoRelease as = obs_data_create();
 	obs_data_set_int(as, "bitrate", s.audioKbps);
-	OBSEncoderAutoRelease aenc = obs_audio_encoder_create("ffmpeg_aac", "station-multistream-audio", as, 0, nullptr);
+	OBSEncoderAutoRelease aenc =
+		obs_audio_encoder_create("ffmpeg_aac", "station-multistream-audio", as, 0, nullptr);
 	if (!venc || !aenc) {
 		error = T("Error.CreateEncoder");
 		return false;
@@ -180,8 +181,9 @@ bool OutputsManager::StartRtmp(Target target, const StationSettings &s, QString 
 		error = T("Error.NoKey");
 		return false;
 	}
-	if (!EnsureSharedEncoders(s, error))
+	if (!EnsureSharedEncoders(s, error)) {
 		return false;
+	}
 
 	OBSDataAutoRelease ss = obs_data_create();
 	obs_data_set_string(ss, "server", server.c_str());
@@ -211,10 +213,12 @@ bool OutputsManager::StartRtmp(Target target, const StationSettings &s, QString 
 
 bool OutputsManager::Start(Target target, const StationSettings &settings, QString &error)
 {
-	if (Active(target))
+	if (Active(target)) {
 		return true;
-	if (target == Target::Receiver || target == Target::Web)
+	}
+	if (target == Target::Receiver || target == Target::Web) {
 		return StartFfmpeg(target, settings, error);
+	}
 	return StartRtmp(target, settings, error);
 }
 
@@ -225,8 +229,9 @@ void OutputsManager::Stop(Target target)
 		obs_output_stop(out);
 		out = nullptr;
 	}
-	if (target == Target::Web && hlsServer_)
+	if (target == Target::Web && hlsServer_) {
 		hlsServer_->Stop();
+	}
 }
 
 void OutputsManager::StopAll()
@@ -241,11 +246,13 @@ void OutputsManager::StopAll()
 
 static QString LanAddress(const StationSettings &s)
 {
-	if (!s.hlsLanAccess)
+	if (!s.hlsLanAccess) {
 		return "127.0.0.1";
+	}
 	for (const QHostAddress &addr : QNetworkInterface::allAddresses()) {
-		if (addr.protocol() == QAbstractSocket::IPv4Protocol && !addr.isLoopback())
+		if (addr.protocol() == QAbstractSocket::IPv4Protocol && !addr.isLoopback()) {
 			return addr.toString();
+		}
 	}
 	return "127.0.0.1";
 }

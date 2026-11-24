@@ -1,4 +1,5 @@
 #include "slot-dialog.hpp"
+#include "ui-common.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -19,14 +20,6 @@
 #include <QTimeEdit>
 
 namespace station {
-
-static QString T(const char *key)
-{
-	return QString::fromUtf8(obs_module_text(key));
-}
-
-/* Saturday-first week, as used by most Arabic-speaking broadcasters. */
-static const int kDisplayOrder[7] = {6, 0, 1, 2, 3, 4, 5};
 
 QString SlotDialog::KindName(SlotKind kind)
 {
@@ -63,8 +56,9 @@ SlotDialog::SlotDialog(const Slot &slot, QWidget *parent) : QDialog(parent), slo
 	form->addRow(T("Slot.Title"), title_);
 
 	kind_ = new QComboBox;
-	for (int i = 0; i < kSlotKindCount; i++)
+	for (int i = 0; i < kSlotKindCount; i++) {
 		kind_->addItem(KindName((SlotKind)i), i);
+	}
 	kind_->setCurrentIndex((int)slot.kind);
 	form->addRow(T("Slot.Kind"), kind_);
 
@@ -138,8 +132,9 @@ SlotDialog::SlotDialog(const Slot &slot, QWidget *parent) : QDialog(parent), slo
 	connect(browse_, &QPushButton::clicked, this, &SlotDialog::Browse);
 	connect(oneOff_, &QCheckBox::toggled, this, [this](bool on) {
 		date_->setEnabled(on);
-		for (QCheckBox *d : days_)
+		for (QCheckBox *d : days_) {
 			d->setEnabled(!on);
+		}
 	});
 	connect(buttons, &QDialogButtonBox::accepted, this, &SlotDialog::Accept);
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -147,8 +142,9 @@ SlotDialog::SlotDialog(const Slot &slot, QWidget *parent) : QDialog(parent), slo
 	UpdateKindUi();
 	target_->setCurrentText(QString::fromStdString(slot.target));
 	date_->setEnabled(oneOff_->isChecked());
-	for (QCheckBox *d : days_)
+	for (QCheckBox *d : days_) {
 		d->setEnabled(!oneOff_->isChecked());
+	}
 }
 
 void SlotDialog::UpdateKindUi()
@@ -159,15 +155,17 @@ void SlotDialog::UpdateKindUi()
 
 	if (kind == SlotKind::Scene) {
 		char **names = obs_frontend_get_scene_names();
-		for (char **n = names; n && *n; n++)
+		for (char **n = names; n && *n; n++) {
 			target_->addItem(QString::fromUtf8(*n));
+		}
 		bfree(names);
 	} else if (kind == SlotKind::Source) {
 		obs_enum_sources(
 			[](void *param, obs_source_t *source) {
 				const char *name = obs_source_get_name(source);
-				if (name && strncmp(name, "station-playout::", 17) != 0)
+				if (name && !IsManagedSourceName(name)) {
 					static_cast<QComboBox *>(param)->addItem(QString::fromUtf8(name));
+				}
 				return true;
 			},
 			target_);
@@ -186,8 +184,9 @@ void SlotDialog::Browse()
 	const QString file = QFileDialog::getOpenFileName(
 		this, T("Slot.Browse"), target_->currentText(),
 		"Media (*.mp4 *.mkv *.mov *.ts *.m4v *.webm *.mp3 *.aac *.wav *.flac *.ogg *.m4a);;* (*)");
-	if (!file.isEmpty())
+	if (!file.isEmpty()) {
 		target_->setCurrentText(file);
+	}
 }
 
 void SlotDialog::Accept()
@@ -200,8 +199,9 @@ void SlotDialog::Accept()
 	s.durationMinutes = duration_->value();
 	s.weekdays = 0;
 	for (int wd = 0; wd < 7; wd++) {
-		if (days_[wd]->isChecked())
+		if (days_[wd]->isChecked()) {
 			s.weekdays |= (uint8_t)(1u << wd);
+		}
 	}
 	if (oneOff_->isChecked()) {
 		const QDate d = date_->date();
@@ -211,8 +211,9 @@ void SlotDialog::Accept()
 	}
 	s.loop = loop_->isChecked();
 	s.enabled = enabled_->isChecked();
-	if (s.title.empty())
+	if (s.title.empty()) {
 		s.title = s.target;
+	}
 
 	const char *errorKey = nullptr;
 	switch (ValidateSlot(s)) {

@@ -18,8 +18,9 @@ static QPointer<station::StationDock> dock;
 
 static void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
-	if (!dock)
+	if (!dock) {
 		return;
+	}
 	switch (event) {
 	case OBS_FRONTEND_EVENT_FINISHED_LOADING:
 		dock->OnFinishedLoading();
@@ -42,8 +43,9 @@ static void OnFrontendEvent(enum obs_frontend_event event, void *)
 bool obs_module_load(void)
 {
 	auto *main = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	if (!main)
+	if (!main) {
 		return false;
+	}
 
 	dock = new station::StationDock(main);
 	if (!obs_frontend_add_dock_by_id("station-studio", obs_module_text("Dock.Title"), dock)) {
@@ -54,8 +56,9 @@ bool obs_module_load(void)
 	obs_frontend_add_tools_menu_item(
 		obs_module_text("Menu.Outputs"),
 		[](void *) {
-			if (dock)
+			if (dock) {
 				dock->OpenOutputsDialog();
+			}
 		},
 		nullptr);
 

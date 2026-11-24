@@ -1,4 +1,5 @@
 #include "outputs-dialog.hpp"
+#include "ui-common.hpp"
 
 #include <obs-module.h>
 
@@ -18,17 +19,13 @@
 
 namespace station {
 
-static QString T(const char *key)
-{
-	return QString::fromUtf8(obs_module_text(key));
-}
-
 static QLineEdit *LtrEdit(const std::string &value, bool secret = false)
 {
 	auto *edit = new QLineEdit(QString::fromStdString(value));
 	edit->setLayoutDirection(Qt::LeftToRight);
-	if (secret)
+	if (secret) {
 		edit->setEchoMode(QLineEdit::Password);
+	}
 	return edit;
 }
 
@@ -133,8 +130,9 @@ OutputsDialog::OutputsDialog(StationSettings &settings, OutputsManager &outputs,
 
 	connect(browse, &QPushButton::clicked, this, [this]() {
 		const QString dir = QFileDialog::getExistingDirectory(this, T("Outputs.Folder"), hlsFolder_->text());
-		if (!dir.isEmpty())
+		if (!dir.isEmpty()) {
 			hlsFolder_->setText(dir);
+		}
 	});
 	connect(buttons, &QDialogButtonBox::rejected, this, [this]() {
 		ApplyFields();
@@ -169,8 +167,9 @@ void OutputsDialog::Toggle(Row &row)
 	} else {
 		ApplyFields();
 		QString error;
-		if (!outputs_.Start(row.target, settings_, error))
+		if (!outputs_.Start(row.target, settings_, error)) {
 			QMessageBox::warning(this, windowTitle(), T("Error.StartOutputDetail").arg(error));
+		}
 	}
 	Refresh();
 }

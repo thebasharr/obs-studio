@@ -57,13 +57,16 @@ std::optional<CivilDate> ParseDate(const std::string &text)
 {
 	CivilDate d;
 	char extra;
-	if (sscanf(text.c_str(), "%d-%d-%d%c", &d.year, &d.month, &d.day, &extra) != 3)
+	if (sscanf(text.c_str(), "%d-%d-%d%c", &d.year, &d.month, &d.day, &extra) != 3) {
 		return std::nullopt;
-	if (d.month < 1 || d.month > 12 || d.day < 1 || d.day > 31)
+	}
+	if (d.month < 1 || d.month > 12 || d.day < 1 || d.day > 31) {
 		return std::nullopt;
+	}
 	/* Reject dates like 2026-02-31 by round-tripping. */
-	if (CivilFromDays(DaysFromCivil(d)) != d)
+	if (CivilFromDays(DaysFromCivil(d)) != d) {
 		return std::nullopt;
+	}
 	return d;
 }
 
@@ -74,14 +77,18 @@ int64_t ToLocalSeconds(const CivilDate &date, int secondOfDay)
 
 SlotError ValidateSlot(const Slot &slot)
 {
-	if (slot.target.empty())
+	if (slot.target.empty()) {
 		return SlotError::MissingTarget;
-	if (slot.startMinute < 0 || slot.startMinute >= kMinutesPerDay)
+	}
+	if (slot.startMinute < 0 || slot.startMinute >= kMinutesPerDay) {
 		return SlotError::BadStart;
-	if (slot.durationMinutes < 1 || slot.durationMinutes > kMinutesPerDay)
+	}
+	if (slot.durationMinutes < 1 || slot.durationMinutes > kMinutesPerDay) {
 		return SlotError::BadDuration;
-	if (!slot.date && (slot.weekdays & kEveryDay) == 0)
+	}
+	if (!slot.date && (slot.weekdays & kEveryDay) == 0) {
 		return SlotError::NoWeekdays;
+	}
 	return SlotError::None;
 }
 
@@ -96,12 +103,14 @@ std::vector<Occurrence> Schedule::OccurrencesStartingOn(const CivilDate &date) c
 	const int weekday = WeekdayOf(date);
 
 	for (const Slot &slot : entries) {
-		if (!slot.enabled || ValidateSlot(slot) != SlotError::None)
+		if (!slot.enabled || ValidateSlot(slot) != SlotError::None) {
 			continue;
+		}
 
 		const bool airs = slot.date ? *slot.date == date : (slot.weekdays & (1u << weekday)) != 0;
-		if (!airs)
+		if (!airs) {
 			continue;
+		}
 
 		Occurrence occ;
 		occ.slot = slot;
@@ -120,20 +129,24 @@ static bool Beats(const Occurrence &a, const Occurrence &b)
 {
 	const bool aDated = a.slot.date.has_value();
 	const bool bDated = b.slot.date.has_value();
-	if (aDated != bDated)
+	if (aDated != bDated) {
 		return aDated;
-	if (a.startSeconds != b.startSeconds)
+	}
+	if (a.startSeconds != b.startSeconds) {
 		return a.startSeconds > b.startSeconds;
+	}
 	const int64_t aLen = a.endSeconds - a.startSeconds;
 	const int64_t bLen = b.endSeconds - b.startSeconds;
-	if (aLen != bLen)
+	if (aLen != bLen) {
 		return aLen < bLen;
+	}
 	return a.slot.id < b.slot.id;
 }
 
 std::optional<Occurrence> Schedule::ActiveAt(int64_t nowSeconds) const
 {
-	int64_t day = nowSeconds >= 0 ? nowSeconds / kSecondsPerDay : (nowSeconds - kSecondsPerDay + 1) / kSecondsPerDay;
+	int64_t day = nowSeconds >= 0 ? nowSeconds / kSecondsPerDay
+				      : (nowSeconds - kSecondsPerDay + 1) / kSecondsPerDay;
 	const CivilDate today = CivilFromDays(day);
 
 	std::optional<Occurrence> best;
@@ -141,8 +154,9 @@ std::optional<Occurrence> Schedule::ActiveAt(int64_t nowSeconds) const
 	for (int offset = -1; offset <= 0; offset++) {
 		for (Occurrence &occ : OccurrencesStartingOn(AddDays(today, offset))) {
 			if (occ.startSeconds <= nowSeconds && nowSeconds < occ.endSeconds) {
-				if (!best || Beats(occ, *best))
+				if (!best || Beats(occ, *best)) {
 					best = std::move(occ);
+				}
 			}
 		}
 	}
@@ -160,18 +174,21 @@ std::optional<Schedule::Change> Schedule::NextChange(int64_t nowSeconds, int hor
 	std::set<int64_t> boundaries;
 	for (int offset = -1; offset <= horizonDays; offset++) {
 		for (const Occurrence &occ : OccurrencesStartingOn(AddDays(today, offset))) {
-			if (occ.startSeconds > nowSeconds)
+			if (occ.startSeconds > nowSeconds) {
 				boundaries.insert(occ.startSeconds);
-			if (occ.endSeconds > nowSeconds)
+			}
+			if (occ.endSeconds > nowSeconds) {
 				boundaries.insert(occ.endSeconds);
+			}
 		}
 	}
 
 	for (int64_t t : boundaries) {
 		std::optional<Occurrence> next = ActiveAt(t);
 		const std::string nextKey = next ? next->Key() : std::string();
-		if (nextKey != currentKey)
+		if (nextKey != currentKey) {
 			return Change{t, std::move(next)};
+		}
 	}
 	return std::nullopt;
 }
@@ -184,8 +201,9 @@ std::vector<Overlap> Schedule::FindOverlaps() const
 	std::vector<Occurrence> week;
 	for (int i = 0; i < 7; i++) {
 		for (Occurrence &occ : OccurrencesStartingOn(AddDays(sunday, i))) {
-			if (!occ.slot.date)
+			if (!occ.slot.date) {
 				week.push_back(std::move(occ));
+			}
 		}
 	}
 
@@ -207,15 +225,18 @@ std::vector<Overlap> Schedule::FindOverlaps() const
 		for (size_t j = i + 1; j < week.size(); j++) {
 			const Occurrence &a = week[i];
 			const Occurrence &b = week[j];
-			if (a.slot.id == b.slot.id)
+			if (a.slot.id == b.slot.id) {
 				continue;
-			if (a.startSeconds >= b.endSeconds || b.startSeconds >= a.endSeconds)
+			}
+			if (a.startSeconds >= b.endSeconds || b.startSeconds >= a.endSeconds) {
 				continue;
+			}
 
 			std::string first = std::min(a.slot.id, b.slot.id);
 			std::string second = std::max(a.slot.id, b.slot.id);
-			if (!seen.insert({first, second}).second)
+			if (!seen.insert({first, second}).second) {
 				continue;
+			}
 
 			const bool aInB = a.startSeconds >= b.startSeconds && a.endSeconds <= b.endSeconds;
 			const bool bInA = b.startSeconds >= a.startSeconds && b.endSeconds <= a.endSeconds;
@@ -228,8 +249,9 @@ std::vector<Overlap> Schedule::FindOverlaps() const
 const Slot *Schedule::Find(const std::string &id) const
 {
 	for (const Slot &slot : entries) {
-		if (slot.id == id)
+		if (slot.id == id) {
 			return &slot;
+		}
 	}
 	return nullptr;
 }
@@ -237,8 +259,9 @@ const Slot *Schedule::Find(const std::string &id) const
 bool Schedule::Remove(const std::string &id)
 {
 	auto it = std::remove_if(entries.begin(), entries.end(), [&](const Slot &s) { return s.id == id; });
-	if (it == entries.end())
+	if (it == entries.end()) {
 		return false;
+	}
 	entries.erase(it, entries.end());
 	return true;
 }
@@ -247,8 +270,9 @@ std::string Schedule::GenerateId() const
 {
 	for (int n = (int)entries.size() + 1;; n++) {
 		std::string id = "slot-" + std::to_string(n);
-		if (!Find(id))
+		if (!Find(id)) {
 			return id;
+		}
 	}
 }
 

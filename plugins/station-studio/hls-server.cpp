@@ -16,7 +16,7 @@ namespace station {
 namespace {
 
 constexpr int kMaxClients = 64;
-constexpr int kRequestTimeoutMs = 10 * 1000;  /* time to send the request line */
+constexpr int kRequestTimeoutMs = 10 * 1000;   /* time to send the request line */
 constexpr int kResponseTimeoutMs = 120 * 1000; /* time to download the response */
 constexpr qint64 kMaxRequestLine = 8192;
 const char *kServedProperty = "stationServed";
@@ -84,8 +84,9 @@ private:
 		head += noCache ? "Cache-Control: no-cache\r\n" : "Cache-Control: max-age=3600\r\n";
 		head += "Connection: close\r\n\r\n";
 		socket->write(head);
-		if (includeBody)
+		if (includeBody) {
 			socket->write(body);
+		}
 		socket->disconnectFromHost();
 
 		/* Cap how long a slow reader may hold the connection. */
@@ -97,8 +98,9 @@ private:
 
 	void HandleClient(QTcpSocket *socket)
 	{
-		if (socket->property(kServedProperty).toBool())
+		if (socket->property(kServedProperty).toBool()) {
 			return;
+		}
 
 		if (!socket->canReadLine()) {
 			if (socket->bytesAvailable() > kMaxRequestLine) {
@@ -117,8 +119,9 @@ private:
 
 		QString path = QString::fromLatin1(parts[1]);
 		const int query = path.indexOf('?');
-		if (query >= 0)
+		if (query >= 0) {
 			path.truncate(query);
+		}
 
 		/* Fixed player files from the plugin data folder. */
 		struct StaticFile {
@@ -132,8 +135,9 @@ private:
 			{"/hls.light.min.js", "hls.light.min.js", "text/javascript; charset=utf-8"},
 		};
 		for (const StaticFile &s : kStatic) {
-			if (path != QLatin1String(s.path))
+			if (path != QLatin1String(s.path)) {
 				continue;
+			}
 			QFile file(QDir(playerFolder_).filePath(QString::fromLatin1(s.file)));
 			if (!file.open(QIODevice::ReadOnly)) {
 				Respond(socket, 404, "text/plain", "not found");
@@ -184,7 +188,8 @@ bool HlsServer::Start(const QString &hlsFolder, const QString &playerFolder, qui
 	worker_->moveToThread(thread_);
 	thread_->start();
 
-	const QHostAddress address = lanAccess ? QHostAddress(QHostAddress::Any) : QHostAddress(QHostAddress::LocalHost);
+	const QHostAddress address = lanAccess ? QHostAddress(QHostAddress::Any)
+					       : QHostAddress(QHostAddress::LocalHost);
 	bool ok = false;
 	QString reason;
 	QMetaObject::invokeMethod(
@@ -203,8 +208,9 @@ bool HlsServer::Start(const QString &hlsFolder, const QString &playerFolder, qui
 
 void HlsServer::Stop()
 {
-	if (!thread_)
+	if (!thread_) {
 		return;
+	}
 
 	/* Sockets and the server must be destroyed on the thread that owns them. */
 	HlsWorker *worker = worker_;

@@ -1,4 +1,5 @@
 #include "playout-controller.hpp"
+#include "ui-common.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -12,12 +13,6 @@
 namespace station {
 
 static const char *kPlayoutScenes[2] = {"Station Playout A", "Station Playout B"};
-static const char *kManagedPrefix = "station-playout::";
-
-static QString T(const char *key)
-{
-	return QString::fromUtf8(obs_module_text(key));
-}
 
 bool PlayoutController::IsManagedScene(const char *name)
 {
@@ -48,11 +43,12 @@ static void ClearScene(obs_scene_t *scene)
 	for (obs_sceneitem_t *item : items) {
 		obs_source_t *source = obs_sceneitem_get_source(item);
 		const char *name = obs_source_get_name(source);
-		const bool owned = name && strncmp(name, kManagedPrefix, strlen(kManagedPrefix)) == 0;
+		const bool owned = IsManagedSourceName(name);
 		OBSSource keep = source;
 		obs_sceneitem_remove(item);
-		if (owned)
+		if (owned) {
 			obs_source_remove(keep);
+		}
 	}
 }
 
@@ -63,12 +59,14 @@ OBSSceneAutoRelease PlayoutController::PrepareInactiveScene()
 
 	int index = nextIndex_;
 	/* Never rebuild the scene that is currently on air. */
-	if (programName && strcmp(programName, kPlayoutScenes[index]) == 0)
+	if (programName && strcmp(programName, kPlayoutScenes[index]) == 0) {
 		index = 1 - index;
+	}
 
 	OBSSceneAutoRelease scene = GetOrCreateScene(kPlayoutScenes[index]);
-	if (scene)
+	if (scene) {
 		ClearScene(scene);
+	}
 	nextIndex_ = 1 - index;
 	return scene;
 }
@@ -76,8 +74,9 @@ OBSSceneAutoRelease PlayoutController::PrepareInactiveScene()
 void PlayoutController::FitToCanvas(obs_sceneitem_t *item)
 {
 	obs_video_info ovi;
-	if (!obs_get_video_info(&ovi))
+	if (!obs_get_video_info(&ovi)) {
 		return;
+	}
 
 	vec2 pos{};
 	vec2 bounds;
@@ -93,7 +92,7 @@ void PlayoutController::FitToCanvas(obs_sceneitem_t *item)
 OBSSourceAutoRelease PlayoutController::CreateManagedSource(const Slot &slot, QString &error)
 {
 	const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-	const std::string name = std::string(kManagedPrefix) + slot.title + "::" + std::to_string(stamp);
+	const std::string name = std::string(kManagedSourcePrefix) + slot.title + "::" + std::to_string(stamp);
 
 	OBSDataAutoRelease settings = obs_data_create();
 	const char *id = nullptr;
@@ -146,8 +145,9 @@ OBSSourceAutoRelease PlayoutController::CreateManagedSource(const Slot &slot, QS
 		error = T("Error.CreateSource");
 		return nullptr;
 	}
-	if (radioMonitoring_)
+	if (radioMonitoring_) {
 		obs_source_set_monitoring_enabled(source, true);
+	}
 	return source;
 }
 
@@ -165,8 +165,9 @@ bool PlayoutController::PlayScene(const std::string &sceneName, QString &error)
 
 bool PlayoutController::Play(const Slot &slot, QString &error)
 {
-	if (slot.kind == SlotKind::Scene)
+	if (slot.kind == SlotKind::Scene) {
 		return PlayScene(slot.target, error);
+	}
 
 	OBSSourceAutoRelease content;
 	bool owned = false;
@@ -179,22 +180,25 @@ bool PlayoutController::Play(const Slot &slot, QString &error)
 		}
 	} else {
 		content = CreateManagedSource(slot, error);
-		if (!content)
+		if (!content) {
 			return false;
+		}
 		owned = true;
 	}
 
 	OBSSceneAutoRelease scene = PrepareInactiveScene();
 	if (!scene) {
-		if (owned)
+		if (owned) {
 			obs_source_remove(content);
+		}
 		error = T("Error.CreateSource");
 		return false;
 	}
 
 	obs_sceneitem_t *item = obs_scene_add(scene, content);
-	if (item)
+	if (item) {
 		FitToCanvas(item);
+	}
 
 	onAirMedia_ = (owned && slot.kind != SlotKind::WebPage) ? obs_source_get_weak_source(content) : nullptr;
 	onAirLoops_ = slot.kind == SlotKind::NetworkStream || slot.loop;
@@ -205,11 +209,13 @@ bool PlayoutController::Play(const Slot &slot, QString &error)
 
 PlayoutController::Health PlayoutController::CurrentHealth() const
 {
-	if (!onAirMedia_)
+	if (!onAirMedia_) {
 		return Health::Ok;
+	}
 	OBSSourceAutoRelease source = obs_weak_source_get_source(onAirMedia_);
-	if (!source)
+	if (!source) {
 		return Health::Ok;
+	}
 
 	switch (obs_source_media_get_state(source)) {
 	case OBS_MEDIA_STATE_ERROR:

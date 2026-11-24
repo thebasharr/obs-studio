@@ -1,4 +1,5 @@
 #include "station-dock.hpp"
+#include "ui-common.hpp"
 #include "outputs-dialog.hpp"
 #include "slot-dialog.hpp"
 
@@ -25,13 +26,6 @@
 
 namespace station {
 
-static QString T(const char *key)
-{
-	return QString::fromUtf8(obs_module_text(key));
-}
-
-static const int kDisplayOrder[7] = {6, 0, 1, 2, 3, 4, 5};
-
 static QString Hm(int minuteOfDay)
 {
 	minuteOfDay = ((minuteOfDay % kMinutesPerDay) + kMinutesPerDay) % kMinutesPerDay;
@@ -53,15 +47,18 @@ static QString Describe(const Slot &s)
 		days = T("Days.Every");
 	} else {
 		QStringList names;
-		for (int wd : kDisplayOrder)
-			if (s.weekdays & (1u << wd))
+		for (int wd : kDisplayOrder) {
+			if (s.weekdays & (1u << wd)) {
 				names << SlotDialog::DayName(wd);
+			}
+		}
 		days = names.join(QString::fromUtf8("\u060C "));
 	}
 	QString text = QString("%1   %2   [%3 \u2022 %4]")
 			       .arg(when, QString::fromStdString(s.title), SlotDialog::KindName(s.kind), days);
-	if (!s.enabled)
+	if (!s.enabled) {
 		text += "   " + T("Slot.Disabled");
+	}
 	return text;
 }
 
@@ -138,10 +135,12 @@ void StationDock::BuildUi()
 	week_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 	week_->verticalHeader()->setDefaultSectionSize(22);
 	QStringList dayHeaders, hourHeaders;
-	for (int wd : kDisplayOrder)
+	for (int wd : kDisplayOrder) {
 		dayHeaders << SlotDialog::DayName(wd);
-	for (int h = 0; h < 24; h++)
+	}
+	for (int h = 0; h < 24; h++) {
 		hourHeaders << Hm(h * 60);
+	}
 	week_->setHorizontalHeaderLabels(dayHeaders);
 	week_->setVerticalHeaderLabels(hourHeaders);
 	week_->setToolTip(T("Dock.WeekTip"));
@@ -173,9 +172,10 @@ void StationDock::BuildUi()
 		QMenu menu(this);
 		for (const QString &id : ids) {
 			const Slot *s = schedule_.Find(id.toStdString());
-			if (s)
+			if (s) {
 				menu.addAction(QString::fromStdString(s->title), this,
 					       [this, id]() { EditSlot(id.toStdString()); });
+			}
 		}
 		menu.exec(QCursor::pos());
 	});
@@ -186,13 +186,15 @@ void StationDock::BuildUi()
 	connect(add, &QPushButton::clicked, this, [this]() { AddSlot(-1, QTime::currentTime().hour(), false); });
 	connect(edit, &QPushButton::clicked, this, [this, selectedId]() {
 		const std::string id = selectedId();
-		if (!id.empty())
+		if (!id.empty()) {
 			EditSlot(id);
+		}
 	});
 	connect(del, &QPushButton::clicked, this, [this, selectedId]() {
 		const std::string id = selectedId();
-		if (!id.empty())
+		if (!id.empty()) {
 			DeleteSlot(id);
+		}
 	});
 	connect(slotList_, &QListWidget::itemDoubleClicked, this,
 		[this](QListWidgetItem *item) { EditSlot(item->data(Qt::UserRole).toString().toStdString()); });
@@ -210,8 +212,7 @@ void StationDock::BuildUi()
 	dayLayout->addWidget(addOneOff);
 	tabs->addTab(dayPage, T("Tab.Day"));
 	connect(day_, &QDateEdit::dateChanged, this, &StationDock::RefreshDayView);
-	connect(addOneOff, &QPushButton::clicked, this,
-		[this]() { AddSlot(-1, QTime::currentTime().hour(), true); });
+	connect(addOneOff, &QPushButton::clicked, this, [this]() { AddSlot(-1, QTime::currentTime().hour(), true); });
 	connect(dayList_, &QListWidget::itemDoubleClicked, this,
 		[this](QListWidgetItem *item) { EditSlot(item->data(Qt::UserRole).toString().toStdString()); });
 
@@ -256,8 +257,9 @@ void StationDock::BuildUi()
 
 void StationDock::Persist()
 {
-	if (!SaveState(schedule_, settings_))
+	if (!SaveState(schedule_, settings_)) {
 		blog(LOG_WARNING, "[station-studio] Failed to save schedule");
+	}
 }
 
 void StationDock::RefreshTakeList()
@@ -269,8 +271,9 @@ void StationDock::RefreshTakeList()
 
 	char **names = obs_frontend_get_scene_names();
 	for (char **n = names; n && *n; n++) {
-		if (PlayoutController::IsManagedScene(*n))
+		if (PlayoutController::IsManagedScene(*n)) {
 			continue;
+		}
 		const QString name = QString::fromUtf8(*n);
 		takeList_->addItem(name);
 		fallback_->addItem(name, name);
@@ -286,12 +289,14 @@ void StationDock::RefreshScheduleViews()
 {
 	week_->clearContents();
 	for (const Slot &s : schedule_.entries) {
-		if (s.date)
+		if (s.date) {
 			continue;
+		}
 		for (int col = 0; col < 7; col++) {
 			const int wd = kDisplayOrder[col];
-			if (!(s.weekdays & (1u << wd)))
+			if (!(s.weekdays & (1u << wd))) {
 				continue;
+			}
 			const int row = s.startMinute / 60;
 			QTableWidgetItem *item = week_->item(row, col);
 			if (!item) {
@@ -309,11 +314,13 @@ void StationDock::RefreshScheduleViews()
 	}
 
 	std::vector<const Slot *> sorted;
-	for (const Slot &s : schedule_.entries)
+	for (const Slot &s : schedule_.entries) {
 		sorted.push_back(&s);
+	}
 	std::sort(sorted.begin(), sorted.end(), [](const Slot *a, const Slot *b) {
-		if (a->date.has_value() != b->date.has_value())
+		if (a->date.has_value() != b->date.has_value()) {
 			return !a->date.has_value();
+		}
 		return a->startMinute < b->startMinute;
 	});
 	slotList_->clear();
@@ -324,9 +331,11 @@ void StationDock::RefreshScheduleViews()
 	}
 
 	int conflicts = 0;
-	for (const Overlap &o : schedule_.FindOverlaps())
-		if (!o.nested)
+	for (const Overlap &o : schedule_.FindOverlaps()) {
+		if (!o.nested) {
 			conflicts++;
+		}
+	}
 	warning_->setVisible(conflicts > 0);
 	warning_->setText(T("Dock.OverlapWarning").arg(conflicts));
 
@@ -342,8 +351,9 @@ void StationDock::RefreshDayView()
 		item->setData(Qt::UserRole, QString::fromStdString(o.slot.id));
 		dayList_->addItem(item);
 	}
-	if (dayList_->count() == 0)
+	if (dayList_->count() == 0) {
 		dayList_->addItem(T("Dock.DayEmpty"));
+	}
 }
 
 void StationDock::AddSlot(int weekday, int hour, bool oneOffOnSelectedDay)
@@ -351,16 +361,18 @@ void StationDock::AddSlot(int weekday, int hour, bool oneOffOnSelectedDay)
 	Slot s;
 	s.id = schedule_.GenerateId();
 	s.startMinute = std::clamp(hour, 0, 23) * 60;
-	if (weekday >= 0)
+	if (weekday >= 0) {
 		s.weekdays = (uint8_t)(1u << weekday);
+	}
 	if (oneOffOnSelectedDay) {
 		const QDate d = day_->date();
 		s.date = CivilDate{d.year(), d.month(), d.day()};
 	}
 
 	SlotDialog dialog(s, this);
-	if (dialog.exec() != QDialog::Accepted)
+	if (dialog.exec() != QDialog::Accepted) {
 		return;
+	}
 	schedule_.entries.push_back(dialog.Result());
 	engine_.ForceRefresh();
 	Persist();
@@ -370,15 +382,18 @@ void StationDock::AddSlot(int weekday, int hour, bool oneOffOnSelectedDay)
 void StationDock::EditSlot(const std::string &id)
 {
 	const Slot *existing = schedule_.Find(id);
-	if (!existing)
+	if (!existing) {
 		return;
+	}
 
 	SlotDialog dialog(*existing, this);
-	if (dialog.exec() != QDialog::Accepted)
+	if (dialog.exec() != QDialog::Accepted) {
 		return;
+	}
 	for (Slot &s : schedule_.entries) {
-		if (s.id == id)
+		if (s.id == id) {
 			s = dialog.Result();
+		}
 	}
 	engine_.ForceRefresh();
 	Persist();
@@ -388,11 +403,13 @@ void StationDock::EditSlot(const std::string &id)
 void StationDock::DeleteSlot(const std::string &id)
 {
 	const Slot *s = schedule_.Find(id);
-	if (!s)
+	if (!s) {
 		return;
-	if (QMessageBox::question(this, T("Dock.Delete"), T("Dock.ConfirmDelete").arg(QString::fromStdString(s->title))) !=
-	    QMessageBox::Yes)
+	}
+	if (QMessageBox::question(this, T("Dock.Delete"),
+				  T("Dock.ConfirmDelete").arg(QString::fromStdString(s->title))) != QMessageBox::Yes) {
 		return;
+	}
 	schedule_.Remove(id);
 	engine_.ForceRefresh();
 	Persist();
@@ -410,8 +427,9 @@ void StationDock::SetAutomation(bool on)
 void StationDock::TakeManual()
 {
 	const std::string name = takeList_->currentText().toStdString();
-	if (name.empty())
+	if (name.empty()) {
 		return;
+	}
 	QString error;
 	if (!playout_.PlayScene(name, error)) {
 		QMessageBox::warning(this, T("Dock.Take"), error);
@@ -431,8 +449,9 @@ void StationDock::ResumeAutomatic()
 
 void StationDock::Tick()
 {
-	if (!loaded_ || suspended_)
+	if (!loaded_ || suspended_) {
 		return;
+	}
 
 	const int64_t now = Now();
 
@@ -441,8 +460,9 @@ void StationDock::Tick()
 		if (!settings_.fallbackScene.empty() && playout_.PlayScene(settings_.fallbackScene, error)) {
 			onAirTitle_ = T("Status.Fallback");
 		} else {
-			if (!error.isEmpty())
+			if (!error.isEmpty()) {
 				lastError_ = error;
+			}
 			onAirTitle_ = T("Status.Gap");
 		}
 	};
@@ -487,27 +507,31 @@ void StationDock::UpdateStatus()
 	automation_->setText(automation_->isChecked() ? T("Dock.AutomationOn") : T("Dock.AutomationOff"));
 	automation_->setStyleSheet(automation_->isChecked() ? "background-color: #1b8a3a; color: white;" : QString());
 
-	if (!engine_.Enabled())
+	if (!engine_.Enabled()) {
 		mode_->setText(T("Mode.Off"));
-	else if (engine_.Manual())
+	} else if (engine_.Manual()) {
 		mode_->setText(T("Mode.Manual"));
-	else
+	} else {
 		mode_->setText(T("Mode.Auto"));
+	}
 	resume_->setEnabled(engine_.Enabled() && engine_.Manual());
 
 	QString onAir = T("Status.OnAir").arg(onAirTitle_.isEmpty() ? QString::fromUtf8("\u2014") : onAirTitle_);
-	if (!lastError_.isEmpty())
+	if (!lastError_.isEmpty()) {
 		onAir += "\n" + T("Status.Error").arg(lastError_);
+	}
 	onAir_->setText(onAir);
 
 	const auto change = schedule_.NextChange(Now());
-	if (!change)
+	if (!change) {
 		next_->setText(T("Status.NothingNext"));
-	else if (change->next)
-		next_->setText(T("Status.Next").arg(HmFromSeconds(change->atSeconds),
-						    QString::fromStdString(change->next->slot.title)));
-	else
+	} else if (change->next) {
+		next_->setText(T("Status.Next")
+				       .arg(HmFromSeconds(change->atSeconds),
+					    QString::fromStdString(change->next->slot.title)));
+	} else {
 		next_->setText(T("Status.NextGap").arg(HmFromSeconds(change->atSeconds)));
+	}
 }
 
 void StationDock::OpenOutputsDialog()

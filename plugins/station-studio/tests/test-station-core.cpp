@@ -39,9 +39,9 @@ static int64_t At(int y, int m, int d, int hh, int mm, int ss = 0)
 
 static void TestCalendar()
 {
-	CHECK(WeekdayOf({1970, 1, 1}) == 4); /* Thursday */
+	CHECK(WeekdayOf({1970, 1, 1}) == 4);   /* Thursday */
 	CHECK(WeekdayOf({2026, 10, 24}) == 6); /* Saturday */
-	CHECK(WeekdayOf({2000, 2, 29}) == 2); /* Tuesday */
+	CHECK(WeekdayOf({2000, 2, 29}) == 2);  /* Tuesday */
 	CHECK(AddDays({2024, 2, 28}, 1) == (CivilDate{2024, 2, 29}));
 	CHECK(AddDays({2023, 12, 31}, 1) == (CivilDate{2024, 1, 1}));
 	CHECK(FormatDate({2026, 3, 7}) == "2026-03-07");
@@ -86,7 +86,7 @@ static void TestWeekdays()
 	Schedule sch;
 	/* Fridays only (bit 5). */
 	sch.entries.push_back(MakeSlot("friday", 10 * 60, 60, 1u << 5));
-	CHECK(sch.ActiveAt(At(2026, 10, 23, 10, 30))); /* Friday */
+	CHECK(sch.ActiveAt(At(2026, 10, 23, 10, 30)));  /* Friday */
 	CHECK(!sch.ActiveAt(At(2026, 10, 24, 10, 30))); /* Saturday */
 }
 
@@ -105,7 +105,7 @@ static void TestNestedInsertResumes()
 {
 	Schedule sch;
 	sch.entries.push_back(MakeSlot("block", 8 * 60, 240)); /* 08:00-12:00 */
-	sch.entries.push_back(MakeSlot("news", 10 * 60, 15)); /* 10:00-10:15 */
+	sch.entries.push_back(MakeSlot("news", 10 * 60, 15));  /* 10:00-10:15 */
 
 	auto a = sch.ActiveAt(At(2026, 10, 24, 9, 0));
 	CHECK(a && a->slot.id == "block");
@@ -146,7 +146,7 @@ static void TestOneOffOverride()
 static void TestPartialOverlapAndDisabled()
 {
 	Schedule sch;
-	sch.entries.push_back(MakeSlot("a", 60, 120)); /* 01:00-03:00 */
+	sch.entries.push_back(MakeSlot("a", 60, 120));  /* 01:00-03:00 */
 	sch.entries.push_back(MakeSlot("b", 120, 120)); /* 02:00-04:00 */
 	auto overlaps = sch.FindOverlaps();
 	CHECK(overlaps.size() == 1 && !overlaps[0].nested);

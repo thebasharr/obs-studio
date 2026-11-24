@@ -10,28 +10,32 @@ static std::string KeyOf(const std::optional<Occurrence> &occ)
 SchedulerEngine::Decision SchedulerEngine::Tick(const Schedule &schedule, int64_t nowSeconds)
 {
 	Decision decision;
-	if (!enabled_)
+	if (!enabled_) {
 		return decision;
+	}
 
 	std::optional<Occurrence> active = schedule.ActiveAt(nowSeconds);
 	const std::string key = KeyOf(active);
 
 	if (manual_) {
-		if (!releaseAtNextSlot_ || key == manualBaselineKey_)
+		if (!releaseAtNextSlot_ || key == manualBaselineKey_) {
 			return decision;
+		}
 		manual_ = false;
 		lastKey_.reset();
 	}
 
 	if (!failedKey_.empty() && key == failedKey_) {
-		if (retryAt_ == 0 || nowSeconds < retryAt_)
+		if (retryAt_ == 0 || nowSeconds < retryAt_) {
 			return decision;
+		}
 		failedKey_.clear();
 		lastKey_.reset();
 	}
 
-	if (lastKey_ && *lastKey_ == key)
+	if (lastKey_ && *lastKey_ == key) {
 		return decision;
+	}
 
 	lastKey_ = key;
 	if (active) {
@@ -45,8 +49,9 @@ SchedulerEngine::Decision SchedulerEngine::Tick(const Schedule &schedule, int64_
 
 void SchedulerEngine::SetEnabled(bool enabled)
 {
-	if (enabled_ == enabled)
+	if (enabled_ == enabled) {
 		return;
+	}
 	enabled_ = enabled;
 	manual_ = false;
 	failedKey_.clear();
@@ -70,8 +75,9 @@ void SchedulerEngine::ReportFailure(const std::string &key, int64_t nowSeconds, 
 {
 	/* Repeated reports for the same failure must not keep pushing the retry
 	   further into the future, or the retry would never happen. */
-	if (key == failedKey_ && retry && retryAt_ > nowSeconds)
+	if (key == failedKey_ && retry && retryAt_ > nowSeconds) {
 		return;
+	}
 	failedKey_ = key;
 	retryAt_ = retry ? nowSeconds + retrySeconds_ : 0;
 }

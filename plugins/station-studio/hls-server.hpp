@@ -20,8 +20,7 @@ public:
 	HlsServer &operator=(const HlsServer &) = delete;
 
 	/* `lanAccess` false binds to localhost only. */
-	bool Start(const QString &hlsFolder, const QString &playerFolder, quint16 port, bool lanAccess,
-		   QString &error);
+	bool Start(const QString &hlsFolder, const QString &playerFolder, quint16 port, bool lanAccess, QString &error);
 	void Stop();
 
 private:
