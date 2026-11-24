@@ -29,6 +29,15 @@ if(NOT DEFINED APPDATA_RELEASE_DATE)
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
       OUTPUT_STRIP_TRAILING_WHITESPACE
     )
+    # Fork without release tags: use the date of the current commit instead.
+    if(NOT APPDATA_RELEASE_DATE)
+      execute_process(
+        COMMAND git log -1 --pretty=%cd --date=short
+        OUTPUT_VARIABLE APPDATA_RELEASE_DATE
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+    endif()
   elseif(EXISTS "${CMAKE_SOURCE_DIR}/cmake/.CMakeBuildNumber")
     file(TIMESTAMP "${CMAKE_SOURCE_DIR}/cmake/.CMakeBuildNumber" APPDATA_RELEASE_DATE "%Y-%m-%d")
   else()
