@@ -139,9 +139,28 @@ bool OutputsManager::CreateOutput(Target target, const StationSettings &s, OBSOu
 			error = T("Error.NoUrl");
 			return false;
 		}
-		/* Same SRT/RIST output OBS uses for its own stream button. */
+		/* SRT encrypts with a 10-79 character passphrase; other protocols
+		   here (UDP, RIST) are not encrypted by this output. */
+		const bool srt = QString::fromStdString(s.receiverUrl).startsWith("srt://", Qt::CaseInsensitive);
+		if (!s.receiverPassphrase.empty()) {
+			if (!srt) {
+				error = T("Error.PassphraseNeedsSrt");
+				return false;
+			}
+			if (s.receiverPassphrase.size() < 10 || s.receiverPassphrase.size() > 79) {
+				error = T("Error.PassphraseLength");
+				return false;
+			}
+		}
+
+		/* Same SRT/RIST output OBS uses for its own stream button. The
+		   custom service hands "password" to SRT as its passphrase. */
 		OBSDataAutoRelease ss = obs_data_create();
 		obs_data_set_string(ss, "server", s.receiverUrl.c_str());
+		if (srt && !s.receiverPassphrase.empty()) {
+			obs_data_set_bool(ss, "use_auth", true);
+			obs_data_set_string(ss, "password", s.receiverPassphrase.c_str());
+		}
 		OBSServiceAutoRelease service = obs_service_create("rtmp_custom", "station-receiver", ss, nullptr);
 		output = obs_output_create("ffmpeg_mpegts_muxer", "station-receiver", nullptr, nullptr);
 		if (!service || !output) {

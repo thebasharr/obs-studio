@@ -81,6 +81,7 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 	s.audioKbps = GetInt(root, "audio_kbps", def.audioKbps);
 	s.hardwareEncoder = GetBool(root, "hardware_encoder", def.hardwareEncoder);
 	s.receiverUrl = GetStr(root, "receiver_url", def.receiverUrl);
+	s.receiverPassphrase = GetStr(root, "receiver_passphrase", def.receiverPassphrase);
 	s.hlsFolder = GetStr(root, "hls_folder", def.hlsFolder);
 	s.hlsPort = GetInt(root, "hls_port", def.hlsPort);
 	s.hlsLanAccess = GetBool(root, "hls_lan_access", def.hlsLanAccess);
@@ -124,6 +125,7 @@ bool SaveState(const Schedule &schedule, const StationSettings &s)
 	obs_data_set_int(root, "audio_kbps", s.audioKbps);
 	obs_data_set_bool(root, "hardware_encoder", s.hardwareEncoder);
 	obs_data_set_string(root, "receiver_url", s.receiverUrl.c_str());
+	obs_data_set_string(root, "receiver_passphrase", s.receiverPassphrase.c_str());
 	obs_data_set_string(root, "hls_folder", s.hlsFolder.c_str());
 	obs_data_set_int(root, "hls_port", s.hlsPort);
 	obs_data_set_bool(root, "hls_lan_access", s.hlsLanAccess);

@@ -20,6 +20,8 @@ struct StationSettings {
 	bool hardwareEncoder = true;
 
 	std::string receiverUrl = "srt://0.0.0.0:9000?mode=listener";
+	/* SRT encryption passphrase (10-79 characters); empty = unencrypted. */
+	std::string receiverPassphrase;
 
 	std::string hlsFolder;
 	int hlsPort = 8080;

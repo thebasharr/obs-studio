@@ -13,6 +13,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRandomGenerator>
 #include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -82,6 +83,24 @@ OutputsDialog::OutputsDialog(StationSettings &settings, OutputsManager &outputs,
 	auto *rForm = new QFormLayout(receiver);
 	receiverUrl_ = LtrEdit(settings.receiverUrl);
 	rForm->addRow(T("Outputs.Url"), receiverUrl_);
+	receiverPassphrase_ = LtrEdit(settings.receiverPassphrase, true);
+	receiverPassphrase_->setMaxLength(79);
+	receiverPassphrase_->setPlaceholderText(T("Outputs.PassphrasePlaceholder"));
+	auto *generate = new QPushButton(T("Outputs.Generate"));
+	auto *passRow = new QHBoxLayout;
+	passRow->addWidget(receiverPassphrase_, 1);
+	passRow->addWidget(generate);
+	rForm->addRow(T("Outputs.Passphrase"), passRow);
+	connect(generate, &QPushButton::clicked, this, [this]() {
+		/* 24 random letters and digits, shown so it can be copied to the receiver. */
+		static const char kChars[] = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+		QString pass;
+		for (int i = 0; i < 24; i++) {
+			pass += QChar(kChars[QRandomGenerator::system()->bounded((int)sizeof(kChars) - 1)]);
+		}
+		receiverPassphrase_->setText(pass);
+		receiverPassphrase_->setEchoMode(QLineEdit::Normal);
+	});
 	auto *rHint = new QLabel(T("Outputs.ReceiverHint"));
 	rHint->setWordWrap(true);
 	rForm->addRow(QString(), rHint);
@@ -157,6 +176,7 @@ void OutputsDialog::ApplyFields()
 	settings_.audioKbps = audioKbps_->value();
 	settings_.hardwareEncoder = hardwareEncoder_->isChecked();
 	settings_.receiverUrl = receiverUrl_->text().trimmed().toStdString();
+	settings_.receiverPassphrase = receiverPassphrase_->text().toStdString();
 	settings_.hlsFolder = hlsFolder_->text().trimmed().toStdString();
 	settings_.hlsPort = hlsPort_->value();
 	settings_.hlsLanAccess = hlsLanAccess_->isChecked();

@@ -40,6 +40,7 @@ private:
 	QSpinBox *videoKbps_;
 	QSpinBox *audioKbps_;
 	QLineEdit *receiverUrl_;
+	QLineEdit *receiverPassphrase_;
 	QLineEdit *hlsFolder_;
 	QSpinBox *hlsPort_;
 	QCheckBox *hlsLanAccess_;
