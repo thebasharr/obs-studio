@@ -292,24 +292,37 @@ void StationDock::RefreshScheduleViews()
 		if (s.date) {
 			continue;
 		}
-		for (int col = 0; col < 7; col++) {
-			const int wd = kDisplayOrder[col];
+		const QString title = QString::fromStdString(s.title);
+		const int firstHour = s.startMinute / 60;
+		const int lastHour = (s.startMinute + s.durationMinutes - 1) / 60; /* may be >= 24 */
+
+		for (int wd = 0; wd < 7; wd++) {
 			if (!(s.weekdays & (1u << wd))) {
 				continue;
 			}
-			const int row = s.startMinute / 60;
-			QTableWidgetItem *item = week_->item(row, col);
-			if (!item) {
-				item = new QTableWidgetItem;
-				week_->setItem(row, col, item);
+			/* Fill every hour the slot covers, continuing into the next
+			   day's column when it runs past midnight. */
+			for (int hour = firstHour; hour <= lastHour; hour++) {
+				const int row = hour % 24;
+				const int col = ColumnOfWeekday((wd + hour / 24) % 7);
+				const QString line = hour == firstHour ? Hm(s.startMinute) + " " + title
+								       : QString::fromUtf8("… ") + title;
+
+				QTableWidgetItem *item = week_->item(row, col);
+				if (!item) {
+					item = new QTableWidgetItem;
+					week_->setItem(row, col, item);
+				}
+				QStringList ids = item->data(Qt::UserRole).toStringList();
+				ids << QString::fromStdString(s.id);
+				item->setData(Qt::UserRole, ids);
+				item->setText(item->text().isEmpty() ? line : item->text() + "\n" + line);
+				item->setToolTip(item->text());
+				/* Lighter shade for the hours after the start. */
+				item->setBackground(!s.enabled          ? QColor(128, 128, 128, 50)
+						    : hour == firstHour ? QColor(52, 120, 200, 90)
+									: QColor(52, 120, 200, 45));
 			}
-			QStringList ids = item->data(Qt::UserRole).toStringList();
-			ids << QString::fromStdString(s.id);
-			item->setData(Qt::UserRole, ids);
-			const QString line = Hm(s.startMinute) + " " + QString::fromStdString(s.title);
-			item->setText(item->text().isEmpty() ? line : item->text() + "\n" + line);
-			item->setToolTip(item->text());
-			item->setBackground(s.enabled ? QColor(52, 120, 200, 70) : QColor(128, 128, 128, 50));
 		}
 	}
 

@@ -18,6 +18,13 @@ inline QString T(const char *key)
    Values are weekday numbers (0 = Sunday). */
 inline constexpr int kDisplayOrder[7] = {6, 0, 1, 2, 3, 4, 5};
 
+/* Inverse of kDisplayOrder: table column of a weekday. */
+inline constexpr int ColumnOfWeekday(int weekday)
+{
+	return (weekday + 1) % 7;
+}
+static_assert(kDisplayOrder[ColumnOfWeekday(0)] == 0 && kDisplayOrder[ColumnOfWeekday(6)] == 6);
+
 /* Name prefix of sources the plugin creates and owns. */
 inline constexpr const char kManagedSourcePrefix[] = "station-playout::";
 
