@@ -16,6 +16,8 @@ struct StationSettings {
 	   main OBS stream/recording, so the operator's normal workflow is untouched. */
 	int videoKbps = 4000;
 	int audioKbps = 160;
+	/* Encode on the graphics card when available (falls back to x264). */
+	bool hardwareEncoder = true;
 
 	std::string receiverUrl = "srt://0.0.0.0:9000?mode=listener";
 

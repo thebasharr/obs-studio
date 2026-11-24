@@ -43,6 +43,8 @@ private:
 	QLineEdit *hlsFolder_;
 	QSpinBox *hlsPort_;
 	QCheckBox *hlsLanAccess_;
+	QCheckBox *hardwareEncoder_;
+	QLabel *encoderInUse_;
 	QLineEdit *playerUrl_;
 	QLineEdit *ytServer_;
 	QLineEdit *ytKey_;

@@ -58,6 +58,12 @@ OutputsDialog::OutputsDialog(StationSettings &settings, OutputsManager &outputs,
 	audioKbps_->setValue(settings.audioKbps);
 	qForm->addRow(T("Outputs.VideoBitrate"), videoKbps_);
 	qForm->addRow(T("Outputs.AudioBitrate"), audioKbps_);
+	hardwareEncoder_ = new QCheckBox(T("Outputs.HardwareEncoder"));
+	hardwareEncoder_->setChecked(settings.hardwareEncoder);
+	qForm->addRow(QString(), hardwareEncoder_);
+	encoderInUse_ = new QLabel;
+	encoderInUse_->setWordWrap(true);
+	qForm->addRow(QString(), encoderInUse_);
 	root->addWidget(quality);
 
 	auto makeRow = [this](int i, OutputsManager::Target target, QFormLayout *form) {
@@ -149,6 +155,7 @@ void OutputsDialog::ApplyFields()
 {
 	settings_.videoKbps = videoKbps_->value();
 	settings_.audioKbps = audioKbps_->value();
+	settings_.hardwareEncoder = hardwareEncoder_->isChecked();
 	settings_.receiverUrl = receiverUrl_->text().trimmed().toStdString();
 	settings_.hlsFolder = hlsFolder_->text().trimmed().toStdString();
 	settings_.hlsPort = hlsPort_->value();
@@ -183,6 +190,15 @@ void OutputsDialog::Refresh()
 		row.status->setStyleSheet(active ? "color: #1b8a3a; font-weight: bold;" : QString());
 		row.toggle->setText(active ? T("Outputs.Stop") : T("Outputs.Start"));
 	}
+	const QString encoder = outputs_.VideoEncoderName();
+	encoderInUse_->setText(encoder.isEmpty() ? T("Outputs.EncoderIdle") : T("Outputs.EncoderInUse").arg(encoder));
+	/* Quality settings apply when the shared encoder starts, i.e. while no
+	   extra output is running. */
+	const bool encoding = !encoder.isEmpty();
+	videoKbps_->setEnabled(!encoding);
+	audioKbps_->setEnabled(!encoding);
+	hardwareEncoder_->setEnabled(!encoding);
+
 	const bool webActive = outputs_.Active(OutputsManager::Target::Web);
 	playerUrl_->setText(webActive ? outputs_.WebPlayerUrl(settings_) : QString());
 }

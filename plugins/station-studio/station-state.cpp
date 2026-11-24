@@ -79,6 +79,7 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 	s.radioMonitoring = GetBool(root, "radio_monitoring", def.radioMonitoring);
 	s.videoKbps = GetInt(root, "video_kbps", def.videoKbps);
 	s.audioKbps = GetInt(root, "audio_kbps", def.audioKbps);
+	s.hardwareEncoder = GetBool(root, "hardware_encoder", def.hardwareEncoder);
 	s.receiverUrl = GetStr(root, "receiver_url", def.receiverUrl);
 	s.hlsFolder = GetStr(root, "hls_folder", def.hlsFolder);
 	s.hlsPort = GetInt(root, "hls_port", def.hlsPort);
@@ -121,6 +122,7 @@ bool SaveState(const Schedule &schedule, const StationSettings &s)
 	obs_data_set_bool(root, "radio_monitoring", s.radioMonitoring);
 	obs_data_set_int(root, "video_kbps", s.videoKbps);
 	obs_data_set_int(root, "audio_kbps", s.audioKbps);
+	obs_data_set_bool(root, "hardware_encoder", s.hardwareEncoder);
 	obs_data_set_string(root, "receiver_url", s.receiverUrl.c_str());
 	obs_data_set_string(root, "hls_folder", s.hlsFolder.c_str());
 	obs_data_set_int(root, "hls_port", s.hlsPort);

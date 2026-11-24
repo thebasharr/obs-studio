@@ -8,6 +8,8 @@
 #include <QHostAddress>
 #include <QNetworkInterface>
 
+#include <cstring>
+
 namespace station {
 
 OutputsManager::OutputsManager() = default;
@@ -49,25 +51,108 @@ QString OutputsManager::LastError(Target target) const
 	return err ? QString::fromUtf8(err) : QString();
 }
 
-static int GopFrames()
+bool OutputsManager::AnyActive() const
 {
-	obs_video_info ovi;
-	if (!obs_get_video_info(&ovi) || ovi.fps_den == 0) {
-		return 60;
-	}
-	return (int)(2 * ovi.fps_num / ovi.fps_den); /* 2 second keyframes */
+	return Active(Target::Receiver) || Active(Target::Web) || Active(Target::YouTube) || Active(Target::Facebook);
 }
 
-bool OutputsManager::StartFfmpeg(Target target, const StationSettings &s, QString &error)
-{
-	OBSDataAutoRelease settings = obs_data_create();
-	std::string url;
+/* H.264 encoders that run on the graphics card, best first. OBS registers
+   these only when the matching hardware and drivers are present. */
+static const char *kHardwareEncoders[] = {
+	"obs_nvenc_h264_tex",                          /* NVIDIA */
+	"h264_texture_amf",                            /* AMD */
+	"obs_qsv11_v2",                                /* Intel Quick Sync */
+	"com.apple.videotoolbox.videoencoder.ave.avc", /* Apple */
+	"ffmpeg_vaapi_tex",                            /* Linux VA-API */
+};
 
-	if (target == Target::Receiver) {
-		url = s.receiverUrl;
-		obs_data_set_string(settings, "format_name", "mpegts");
-		obs_data_set_string(settings, "muxer_settings", "mpegts_flags=resend_headers");
-	} else {
+static bool EncoderUsable(const char *id)
+{
+	const char *codec = obs_get_encoder_codec(id);
+	if (!codec || strcmp(codec, "h264") != 0) {
+		return false;
+	}
+	return (obs_get_encoder_caps(id) & (OBS_ENCODER_CAP_DEPRECATED | OBS_ENCODER_CAP_INTERNAL)) == 0;
+}
+
+bool OutputsManager::EnsureSharedEncoders(const StationSettings &s, bool allowHardware, QString &error)
+{
+	/* Encoders already feeding a running output are reused as they are:
+	   new outputs join them at the next keyframe. */
+	if (videoEncoder_ && audioEncoder_ && obs_encoder_active(videoEncoder_)) {
+		return true;
+	}
+
+	/* Nothing is running: rebuild so changed settings take effect. */
+	videoEncoder_ = nullptr;
+	audioEncoder_ = nullptr;
+	videoEncoderIsHardware_ = false;
+
+	OBSDataAutoRelease vs = obs_data_create();
+	obs_data_set_string(vs, "rate_control", "CBR");
+	obs_data_set_int(vs, "bitrate", s.videoKbps);
+	obs_data_set_int(vs, "keyint_sec", 2); /* HLS segments and fast joins need regular keyframes */
+	/* Stream headers in every keyframe, so HLS segments are self-contained
+	   even when the web output joins an encoder that is already running. */
+	obs_data_set_bool(vs, "repeat_headers", true);
+
+	OBSEncoderAutoRelease venc;
+	if (allowHardware && s.hardwareEncoder) {
+		for (const char *id : kHardwareEncoders) {
+			if (!EncoderUsable(id)) {
+				continue;
+			}
+			venc = obs_video_encoder_create(id, "station-video", vs, nullptr);
+			if (venc) {
+				videoEncoderIsHardware_ = true;
+				break;
+			}
+		}
+	}
+	if (!venc) {
+		obs_data_set_string(vs, "preset", "veryfast");
+		obs_data_set_string(vs, "profile", "high");
+		venc = obs_video_encoder_create("obs_x264", "station-video", vs, nullptr);
+	}
+
+	OBSDataAutoRelease as = obs_data_create();
+	obs_data_set_int(as, "bitrate", s.audioKbps);
+	OBSEncoderAutoRelease aenc = obs_audio_encoder_create("ffmpeg_aac", "station-audio", as, 0, nullptr);
+	if (!venc || !aenc) {
+		error = T("Error.CreateEncoder");
+		return false;
+	}
+	obs_encoder_set_video(venc, obs_get_video());
+	obs_encoder_set_audio(aenc, obs_get_audio());
+	videoEncoder_ = venc.Get();
+	audioEncoder_ = aenc.Get();
+
+	blog(LOG_INFO, "[station-studio] Extra outputs encode with '%s'", obs_encoder_get_id(videoEncoder_));
+	return true;
+}
+
+bool OutputsManager::CreateOutput(Target target, const StationSettings &s, OBSOutputAutoRelease &output, QString &error)
+{
+	switch (target) {
+	case Target::Receiver: {
+		if (s.receiverUrl.empty()) {
+			error = T("Error.NoUrl");
+			return false;
+		}
+		/* Same SRT/RIST output OBS uses for its own stream button. */
+		OBSDataAutoRelease ss = obs_data_create();
+		obs_data_set_string(ss, "server", s.receiverUrl.c_str());
+		OBSServiceAutoRelease service = obs_service_create("rtmp_custom", "station-receiver", ss, nullptr);
+		output = obs_output_create("ffmpeg_mpegts_muxer", "station-receiver", nullptr, nullptr);
+		if (!service || !output) {
+			error = T("Error.CreateOutput");
+			return false;
+		}
+		obs_output_set_service(output, service);
+		obs_output_set_reconnect_settings(output, 20, 5);
+		return true;
+	}
+	case Target::Web: {
 		if (s.hlsFolder.empty()) {
 			error = T("Error.NoHlsFolder");
 			return false;
@@ -81,40 +166,88 @@ bool OutputsManager::StartFfmpeg(Target target, const StationSettings &s, QStrin
 		for (const QString &f : dir.entryList({"live*.ts", "live.m3u8"}, QDir::Files)) {
 			dir.remove(f);
 		}
-		url = dir.filePath("live.m3u8").toStdString();
-		obs_data_set_string(settings, "format_name", "hls");
+		/* OBS's recording muxer writes HLS when the file ends in .m3u8.
+		   delete_segments keeps a 24/7 stream from filling the disk. */
+		OBSDataAutoRelease settings = obs_data_create();
+		obs_data_set_string(settings, "path", dir.filePath("live.m3u8").toUtf8().constData());
 		obs_data_set_string(settings, "muxer_settings",
 				    "hls_time=2 hls_list_size=6 hls_flags=delete_segments+independent_segments");
+		output = obs_output_create("ffmpeg_muxer", "station-web", settings, nullptr);
+		if (!output) {
+			error = T("Error.CreateOutput");
+			return false;
+		}
+		return true;
 	}
+	case Target::YouTube:
+	case Target::Facebook: {
+		const bool yt = target == Target::YouTube;
+		const std::string &server = yt ? s.youtubeServer : s.facebookServer;
+		const std::string &key = yt ? s.youtubeKey : s.facebookKey;
+		if (server.empty() || key.empty()) {
+			error = T("Error.NoKey");
+			return false;
+		}
+		OBSDataAutoRelease ss = obs_data_create();
+		obs_data_set_string(ss, "server", server.c_str());
+		obs_data_set_string(ss, "key", key.c_str());
+		const char *name = yt ? "station-youtube" : "station-facebook";
+		OBSServiceAutoRelease service = obs_service_create("rtmp_custom", name, ss, nullptr);
+		output = obs_output_create("rtmp_output", name, nullptr, nullptr);
+		if (!service || !output) {
+			error = T("Error.CreateOutput");
+			return false;
+		}
+		obs_output_set_service(output, service);
+		obs_output_set_reconnect_settings(output, 20, 5);
+		return true;
+	}
+	}
+	return false;
+}
 
-	if (url.empty()) {
-		error = T("Error.NoUrl");
+bool OutputsManager::StartOutput(Target target, const StationSettings &s, QString &error)
+{
+	OBSOutputAutoRelease output;
+	if (!CreateOutput(target, s, output, error)) {
 		return false;
 	}
 
-	obs_data_set_string(settings, "url", url.c_str());
-	obs_data_set_int(settings, "gop_size", GopFrames());
-	obs_data_set_int(settings, "video_bitrate", s.videoKbps);
-	obs_data_set_string(settings, "video_encoder", "libx264");
-	obs_data_set_string(settings, "video_settings", "preset=veryfast tune=zerolatency profile=high");
-	obs_data_set_int(settings, "audio_bitrate", s.audioKbps);
-	obs_data_set_string(settings, "audio_encoder", "aac");
+	/* A hardware encoder can fail to open (busy GPU, driver limits). If no
+	   other output depends on it yet, retry once with the software encoder. */
+	for (int attempt = 0; attempt < 2; attempt++) {
+		const bool allowHardware = attempt == 0;
+		if (!EnsureSharedEncoders(s, allowHardware, error)) {
+			return false;
+		}
+		obs_output_set_video_encoder(output, videoEncoder_);
+		obs_output_set_audio_encoder(output, audioEncoder_, 0);
 
-	const char *name = target == Target::Receiver ? "station-receiver" : "station-web";
-	OBSOutputAutoRelease output = obs_output_create("ffmpeg_output", name, settings, nullptr);
-	if (!output) {
-		error = T("Error.CreateOutput");
-		return false;
-	}
-	obs_output_set_mixers(output, 1);
+		if (obs_output_start(output)) {
+			Slot(target) = output.Get();
+			return true;
+		}
 
-	if (!obs_output_start(output)) {
 		const char *err = obs_output_get_last_error(output);
 		error = err ? QString::fromUtf8(err) : T("Error.StartOutput");
+		if (!videoEncoderIsHardware_ || AnyActive()) {
+			return false;
+		}
+		blog(LOG_WARNING, "[station-studio] Hardware encoder failed (%s), falling back to x264",
+		     error.toUtf8().constData());
+		videoEncoder_ = nullptr; /* force a rebuild without hardware */
+	}
+	return false;
+}
+
+bool OutputsManager::Start(Target target, const StationSettings &settings, QString &error)
+{
+	if (Active(target)) {
+		return true;
+	}
+	if (!StartOutput(target, settings, error)) {
 		return false;
 	}
-
-	Slot(target) = output.Get();
 
 	if (target == Target::Web) {
 		if (!hlsServer_) {
@@ -123,103 +256,22 @@ bool OutputsManager::StartFfmpeg(Target target, const StationSettings &s, QStrin
 		char *playerDir = obs_module_file("player");
 		const QString playerFolder = QString::fromUtf8(playerDir ? playerDir : "");
 		bfree(playerDir);
-		if (!hlsServer_->Start(QString::fromStdString(s.hlsFolder), playerFolder, (quint16)s.hlsPort,
-				       s.hlsLanAccess, error)) {
-			obs_output_stop(output);
-			Slot(target) = nullptr;
+		if (!hlsServer_->Start(QString::fromStdString(settings.hlsFolder), playerFolder,
+				       (quint16)settings.hlsPort, settings.hlsLanAccess, error)) {
+			Stop(Target::Web);
 			return false;
 		}
 	}
 	return true;
 }
 
-bool OutputsManager::EnsureSharedEncoders(const StationSettings &s, QString &error)
+QString OutputsManager::VideoEncoderName() const
 {
-	/* YouTube and Facebook share one encoder pair: one encode, two uploads. */
-	if (videoEncoder_ && audioEncoder_) {
-		if (obs_encoder_active(videoEncoder_)) {
-			return true;
-		}
-		OBSDataAutoRelease vs = obs_encoder_get_settings(videoEncoder_);
-		obs_data_set_int(vs, "bitrate", s.videoKbps);
-		obs_encoder_update(videoEncoder_, vs);
-		OBSDataAutoRelease as = obs_encoder_get_settings(audioEncoder_);
-		obs_data_set_int(as, "bitrate", s.audioKbps);
-		obs_encoder_update(audioEncoder_, as);
-		return true;
+	if (!videoEncoder_ || !obs_encoder_active(videoEncoder_)) {
+		return QString();
 	}
-
-	OBSDataAutoRelease vs = obs_data_create();
-	obs_data_set_string(vs, "rate_control", "CBR");
-	obs_data_set_int(vs, "bitrate", s.videoKbps);
-	obs_data_set_int(vs, "keyint_sec", 2);
-	obs_data_set_string(vs, "preset", "veryfast");
-	obs_data_set_string(vs, "profile", "high");
-
-	OBSEncoderAutoRelease venc = obs_video_encoder_create("obs_x264", "station-multistream-video", vs, nullptr);
-	OBSDataAutoRelease as = obs_data_create();
-	obs_data_set_int(as, "bitrate", s.audioKbps);
-	OBSEncoderAutoRelease aenc =
-		obs_audio_encoder_create("ffmpeg_aac", "station-multistream-audio", as, 0, nullptr);
-	if (!venc || !aenc) {
-		error = T("Error.CreateEncoder");
-		return false;
-	}
-	obs_encoder_set_video(venc, obs_get_video());
-	obs_encoder_set_audio(aenc, obs_get_audio());
-	videoEncoder_ = venc.Get();
-	audioEncoder_ = aenc.Get();
-	return true;
-}
-
-bool OutputsManager::StartRtmp(Target target, const StationSettings &s, QString &error)
-{
-	const bool yt = target == Target::YouTube;
-	const std::string &server = yt ? s.youtubeServer : s.facebookServer;
-	const std::string &key = yt ? s.youtubeKey : s.facebookKey;
-	if (server.empty() || key.empty()) {
-		error = T("Error.NoKey");
-		return false;
-	}
-	if (!EnsureSharedEncoders(s, error)) {
-		return false;
-	}
-
-	OBSDataAutoRelease ss = obs_data_create();
-	obs_data_set_string(ss, "server", server.c_str());
-	obs_data_set_string(ss, "key", key.c_str());
-	OBSServiceAutoRelease service =
-		obs_service_create("rtmp_custom", yt ? "station-youtube" : "station-facebook", ss, nullptr);
-
-	OBSOutputAutoRelease output =
-		obs_output_create("rtmp_output", yt ? "station-youtube" : "station-facebook", nullptr, nullptr);
-	if (!service || !output) {
-		error = T("Error.CreateOutput");
-		return false;
-	}
-	obs_output_set_service(output, service);
-	obs_output_set_video_encoder(output, videoEncoder_);
-	obs_output_set_audio_encoder(output, audioEncoder_, 0);
-	obs_output_set_reconnect_settings(output, 20, 5);
-
-	if (!obs_output_start(output)) {
-		const char *err = obs_output_get_last_error(output);
-		error = err ? QString::fromUtf8(err) : T("Error.StartOutput");
-		return false;
-	}
-	Slot(target) = output.Get();
-	return true;
-}
-
-bool OutputsManager::Start(Target target, const StationSettings &settings, QString &error)
-{
-	if (Active(target)) {
-		return true;
-	}
-	if (target == Target::Receiver || target == Target::Web) {
-		return StartFfmpeg(target, settings, error);
-	}
-	return StartRtmp(target, settings, error);
+	const char *name = obs_encoder_get_display_name(obs_encoder_get_id(videoEncoder_));
+	return QString::fromUtf8(name ? name : obs_encoder_get_id(videoEncoder_));
 }
 
 void OutputsManager::Stop(Target target)
@@ -242,6 +294,7 @@ void OutputsManager::StopAll()
 	Stop(Target::Facebook);
 	videoEncoder_ = nullptr;
 	audioEncoder_ = nullptr;
+	videoEncoderIsHardware_ = false;
 }
 
 static QString LanAddress(const StationSettings &s)
