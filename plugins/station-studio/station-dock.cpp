@@ -285,7 +285,7 @@ void StationDock::RefreshTakeList()
 void StationDock::RefreshScheduleViews()
 {
 	week_->clearContents();
-	for (const Slot &s : schedule_.slots) {
+	for (const Slot &s : schedule_.entries) {
 		if (s.date)
 			continue;
 		for (int col = 0; col < 7; col++) {
@@ -309,7 +309,7 @@ void StationDock::RefreshScheduleViews()
 	}
 
 	std::vector<const Slot *> sorted;
-	for (const Slot &s : schedule_.slots)
+	for (const Slot &s : schedule_.entries)
 		sorted.push_back(&s);
 	std::sort(sorted.begin(), sorted.end(), [](const Slot *a, const Slot *b) {
 		if (a->date.has_value() != b->date.has_value())
@@ -361,7 +361,7 @@ void StationDock::AddSlot(int weekday, int hour, bool oneOffOnSelectedDay)
 	SlotDialog dialog(s, this);
 	if (dialog.exec() != QDialog::Accepted)
 		return;
-	schedule_.slots.push_back(dialog.Result());
+	schedule_.entries.push_back(dialog.Result());
 	engine_.ForceRefresh();
 	Persist();
 	RefreshScheduleViews();
@@ -376,7 +376,7 @@ void StationDock::EditSlot(const std::string &id)
 	SlotDialog dialog(*existing, this);
 	if (dialog.exec() != QDialog::Accepted)
 		return;
-	for (Slot &s : schedule_.slots) {
+	for (Slot &s : schedule_.entries) {
 		if (s.id == id)
 			s = dialog.Result();
 	}
@@ -472,6 +472,9 @@ void StationDock::Tick()
 			const bool retry = health == PlayoutController::Health::Error;
 			lastError_ = retry ? T("Error.MediaFailed") : T("Status.Ended");
 			engine_.ReportFailure(*engine_.CurrentKey(), now, retry);
+			/* Stop watching the failed media; otherwise, with no fallback
+			   scene, the same failure is reported again on every tick. */
+			playout_.Release();
 			playFallback();
 		}
 	}

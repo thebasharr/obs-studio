@@ -147,7 +147,7 @@ OBSSourceAutoRelease PlayoutController::CreateManagedSource(const Slot &slot, QS
 		return nullptr;
 	}
 	if (radioMonitoring_)
-		obs_source_set_monitoring_type(source, OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT);
+		obs_source_set_monitoring_enabled(source, true);
 	return source;
 }
 

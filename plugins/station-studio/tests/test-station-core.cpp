@@ -69,8 +69,8 @@ static void TestValidation()
 static void TestActiveBasic()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("morning", 6 * 60, 180));
-	sch.slots.push_back(MakeSlot("noon", 12 * 60, 60));
+	sch.entries.push_back(MakeSlot("morning", 6 * 60, 180));
+	sch.entries.push_back(MakeSlot("noon", 12 * 60, 60));
 
 	CHECK(!sch.ActiveAt(At(2026, 10, 24, 5, 59, 59)));
 	auto a = sch.ActiveAt(At(2026, 10, 24, 6, 0));
@@ -85,7 +85,7 @@ static void TestWeekdays()
 {
 	Schedule sch;
 	/* Fridays only (bit 5). */
-	sch.slots.push_back(MakeSlot("friday", 10 * 60, 60, 1u << 5));
+	sch.entries.push_back(MakeSlot("friday", 10 * 60, 60, 1u << 5));
 	CHECK(sch.ActiveAt(At(2026, 10, 23, 10, 30))); /* Friday */
 	CHECK(!sch.ActiveAt(At(2026, 10, 24, 10, 30))); /* Saturday */
 }
@@ -94,7 +94,7 @@ static void TestOvernight()
 {
 	Schedule sch;
 	/* Saturdays 23:00 for 3 hours -> runs into Sunday 02:00. */
-	sch.slots.push_back(MakeSlot("late", 23 * 60, 180, 1u << 6));
+	sch.entries.push_back(MakeSlot("late", 23 * 60, 180, 1u << 6));
 	auto a = sch.ActiveAt(At(2026, 10, 25, 1, 30)); /* Sunday */
 	CHECK(a && a->slot.id == "late");
 	CHECK(a && a->startDate == (CivilDate{2026, 10, 24}));
@@ -104,8 +104,8 @@ static void TestOvernight()
 static void TestNestedInsertResumes()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("block", 8 * 60, 240)); /* 08:00-12:00 */
-	sch.slots.push_back(MakeSlot("news", 10 * 60, 15)); /* 10:00-10:15 */
+	sch.entries.push_back(MakeSlot("block", 8 * 60, 240)); /* 08:00-12:00 */
+	sch.entries.push_back(MakeSlot("news", 10 * 60, 15)); /* 10:00-10:15 */
 
 	auto a = sch.ActiveAt(At(2026, 10, 24, 9, 0));
 	CHECK(a && a->slot.id == "block");
@@ -132,10 +132,10 @@ static void TestNestedInsertResumes()
 static void TestOneOffOverride()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("daily", 0, 1440));
+	sch.entries.push_back(MakeSlot("daily", 0, 1440));
 	Slot special = MakeSlot("match", 20 * 60, 120);
 	special.date = CivilDate{2026, 10, 24};
-	sch.slots.push_back(special);
+	sch.entries.push_back(special);
 
 	auto a = sch.ActiveAt(At(2026, 10, 24, 20, 30));
 	CHECK(a && a->slot.id == "match");
@@ -146,15 +146,15 @@ static void TestOneOffOverride()
 static void TestPartialOverlapAndDisabled()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("a", 60, 120)); /* 01:00-03:00 */
-	sch.slots.push_back(MakeSlot("b", 120, 120)); /* 02:00-04:00 */
+	sch.entries.push_back(MakeSlot("a", 60, 120)); /* 01:00-03:00 */
+	sch.entries.push_back(MakeSlot("b", 120, 120)); /* 02:00-04:00 */
 	auto overlaps = sch.FindOverlaps();
 	CHECK(overlaps.size() == 1 && !overlaps[0].nested);
 
 	auto x = sch.ActiveAt(At(2026, 10, 24, 2, 30));
 	CHECK(x && x->slot.id == "b"); /* later start wins */
 
-	sch.slots[1].enabled = false;
+	sch.entries[1].enabled = false;
 	auto y = sch.ActiveAt(At(2026, 10, 24, 2, 30));
 	CHECK(y && y->slot.id == "a");
 	CHECK(sch.FindOverlaps().empty());
@@ -163,17 +163,17 @@ static void TestPartialOverlapAndDisabled()
 static void TestIdsAndRemove()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("slot-1", 0, 10));
+	sch.entries.push_back(MakeSlot("slot-1", 0, 10));
 	CHECK(sch.GenerateId() == "slot-2");
 	CHECK(sch.Remove("slot-1"));
 	CHECK(!sch.Remove("slot-1"));
-	CHECK(sch.slots.empty());
+	CHECK(sch.entries.empty());
 }
 
 static void TestEngineSwitchesOnlyOnChange()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("a", 60, 60)); /* 01:00-02:00 */
+	sch.entries.push_back(MakeSlot("a", 60, 60)); /* 01:00-02:00 */
 	SchedulerEngine eng;
 
 	CHECK(eng.Tick(sch, At(2026, 10, 24, 1, 0)).type == SchedulerEngine::Decision::Type::None); /* disabled */
@@ -194,8 +194,8 @@ static void TestEngineSwitchesOnlyOnChange()
 static void TestEngineManualHold()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("a", 60, 60));
-	sch.slots.push_back(MakeSlot("b", 120, 60));
+	sch.entries.push_back(MakeSlot("a", 60, 60));
+	sch.entries.push_back(MakeSlot("b", 120, 60));
 	SchedulerEngine eng;
 	eng.SetEnabled(true);
 	eng.Tick(sch, At(2026, 10, 24, 1, 0));
@@ -213,8 +213,8 @@ static void TestEngineManualHold()
 static void TestEngineManualReleaseAtNextSlot()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("a", 60, 60));
-	sch.slots.push_back(MakeSlot("b", 120, 60));
+	sch.entries.push_back(MakeSlot("a", 60, 60));
+	sch.entries.push_back(MakeSlot("b", 120, 60));
 	SchedulerEngine eng;
 	eng.SetEnabled(true);
 	eng.SetReleaseManualAtNextSlot(true);
@@ -230,7 +230,7 @@ static void TestEngineManualReleaseAtNextSlot()
 static void TestEngineFailureRetry()
 {
 	Schedule sch;
-	sch.slots.push_back(MakeSlot("a", 60, 60));
+	sch.entries.push_back(MakeSlot("a", 60, 60));
 	SchedulerEngine eng(30);
 	eng.SetEnabled(true);
 	auto d = eng.Tick(sch, At(2026, 10, 24, 1, 0));
@@ -239,6 +239,14 @@ static void TestEngineFailureRetry()
 	eng.ReportFailure(d.occurrence->Key(), At(2026, 10, 24, 1, 0), true);
 	CHECK(eng.Tick(sch, At(2026, 10, 24, 1, 0, 29)).type == SchedulerEngine::Decision::Type::None);
 	CHECK(eng.Tick(sch, At(2026, 10, 24, 1, 0, 30)).type == SchedulerEngine::Decision::Type::Play);
+
+	/* Reporting the same failure every second must not postpone the retry. */
+	eng.ReportFailure(d.occurrence->Key(), At(2026, 10, 24, 1, 0, 31), true);
+	for (int s = 32; s < 61; s++) {
+		eng.ReportFailure(d.occurrence->Key(), At(2026, 10, 24, 1, 0, s), true);
+		CHECK(eng.Tick(sch, At(2026, 10, 24, 1, 0, s)).type == SchedulerEngine::Decision::Type::None);
+	}
+	CHECK(eng.Tick(sch, At(2026, 10, 24, 1, 1, 1)).type == SchedulerEngine::Decision::Type::Play);
 
 	eng.ReportFailure(d.occurrence->Key(), At(2026, 10, 24, 1, 1), false);
 	CHECK(eng.Tick(sch, At(2026, 10, 24, 1, 30)).type == SchedulerEngine::Decision::Type::None);

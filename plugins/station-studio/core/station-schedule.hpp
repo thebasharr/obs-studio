@@ -88,7 +88,8 @@ struct Overlap {
 
 class Schedule {
 public:
-	std::vector<Slot> slots;
+	/* Not named "slots": Qt defines that as a macro. */
+	std::vector<Slot> entries;
 
 	std::vector<Occurrence> OccurrencesStartingOn(const CivilDate &date) const;
 

@@ -95,7 +95,7 @@ std::vector<Occurrence> Schedule::OccurrencesStartingOn(const CivilDate &date) c
 	std::vector<Occurrence> out;
 	const int weekday = WeekdayOf(date);
 
-	for (const Slot &slot : slots) {
+	for (const Slot &slot : entries) {
 		if (!slot.enabled || ValidateSlot(slot) != SlotError::None)
 			continue;
 
@@ -227,7 +227,7 @@ std::vector<Overlap> Schedule::FindOverlaps() const
 
 const Slot *Schedule::Find(const std::string &id) const
 {
-	for (const Slot &slot : slots) {
+	for (const Slot &slot : entries) {
 		if (slot.id == id)
 			return &slot;
 	}
@@ -236,16 +236,16 @@ const Slot *Schedule::Find(const std::string &id) const
 
 bool Schedule::Remove(const std::string &id)
 {
-	auto it = std::remove_if(slots.begin(), slots.end(), [&](const Slot &s) { return s.id == id; });
-	if (it == slots.end())
+	auto it = std::remove_if(entries.begin(), entries.end(), [&](const Slot &s) { return s.id == id; });
+	if (it == entries.end())
 		return false;
-	slots.erase(it, slots.end());
+	entries.erase(it, entries.end());
 	return true;
 }
 
 std::string Schedule::GenerateId() const
 {
-	for (int n = (int)slots.size() + 1;; n++) {
+	for (int n = (int)entries.size() + 1;; n++) {
 		std::string id = "slot-" + std::to_string(n);
 		if (!Find(id))
 			return id;

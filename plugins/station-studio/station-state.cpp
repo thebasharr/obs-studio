@@ -44,11 +44,11 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 	if (!root)
 		return false;
 
-	schedule.slots.clear();
-	OBSDataArrayAutoRelease slots = obs_data_get_array(root, "slots");
-	const size_t count = obs_data_array_count(slots);
+	schedule.entries.clear();
+	OBSDataArrayAutoRelease slotArray = obs_data_get_array(root, "slots");
+	const size_t count = obs_data_array_count(slotArray);
 	for (size_t i = 0; i < count; i++) {
-		OBSDataAutoRelease item = obs_data_array_item(slots, i);
+		OBSDataAutoRelease item = obs_data_array_item(slotArray, i);
 		Slot slot;
 		slot.id = obs_data_get_string(item, "id");
 		slot.title = obs_data_get_string(item, "title");
@@ -65,7 +65,7 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 		slot.enabled = GetBool(item, "enabled", true);
 		if (slot.id.empty())
 			slot.id = schedule.GenerateId();
-		schedule.slots.push_back(std::move(slot));
+		schedule.entries.push_back(std::move(slot));
 	}
 
 	const StationSettings def;
@@ -92,8 +92,8 @@ bool SaveState(const Schedule &schedule, const StationSettings &s)
 		return false;
 
 	OBSDataAutoRelease root = obs_data_create();
-	OBSDataArrayAutoRelease slots = obs_data_array_create();
-	for (const Slot &slot : schedule.slots) {
+	OBSDataArrayAutoRelease slotArray = obs_data_array_create();
+	for (const Slot &slot : schedule.entries) {
 		OBSDataAutoRelease item = obs_data_create();
 		obs_data_set_string(item, "id", slot.id.c_str());
 		obs_data_set_string(item, "title", slot.title.c_str());
@@ -105,9 +105,9 @@ bool SaveState(const Schedule &schedule, const StationSettings &s)
 		obs_data_set_string(item, "target", slot.target.c_str());
 		obs_data_set_bool(item, "loop", slot.loop);
 		obs_data_set_bool(item, "enabled", slot.enabled);
-		obs_data_array_push_back(slots, item);
+		obs_data_array_push_back(slotArray, item);
 	}
-	obs_data_set_array(root, "slots", slots);
+	obs_data_set_array(root, "slots", slotArray);
 
 	obs_data_set_bool(root, "automation_enabled", s.automationEnabled);
 	obs_data_set_string(root, "fallback_scene", s.fallbackScene.c_str());

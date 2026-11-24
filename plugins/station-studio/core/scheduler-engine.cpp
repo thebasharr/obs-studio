@@ -68,6 +68,10 @@ void SchedulerEngine::ResumeAutomatic()
 
 void SchedulerEngine::ReportFailure(const std::string &key, int64_t nowSeconds, bool retry)
 {
+	/* Repeated reports for the same failure must not keep pushing the retry
+	   further into the future, or the retry would never happen. */
+	if (key == failedKey_ && retry && retryAt_ > nowSeconds)
+		return;
 	failedKey_ = key;
 	retryAt_ = retry ? nowSeconds + retrySeconds_ : 0;
 }
