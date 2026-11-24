@@ -121,7 +121,11 @@ bool OutputsManager::StartFfmpeg(Target target, const StationSettings &s, QStrin
 	if (target == Target::Web) {
 		if (!hlsServer_)
 			hlsServer_ = std::make_unique<HlsServer>();
-		if (!hlsServer_->Start(QString::fromStdString(s.hlsFolder), (quint16)s.hlsPort, error)) {
+		char *playerDir = obs_module_file("player");
+		const QString playerFolder = QString::fromUtf8(playerDir ? playerDir : "");
+		bfree(playerDir);
+		if (!hlsServer_->Start(QString::fromStdString(s.hlsFolder), playerFolder, (quint16)s.hlsPort,
+				       s.hlsLanAccess, error)) {
 			obs_output_stop(output);
 			Slot(target) = nullptr;
 			return false;
@@ -235,8 +239,10 @@ void OutputsManager::StopAll()
 	audioEncoder_ = nullptr;
 }
 
-static QString LanAddress()
+static QString LanAddress(const StationSettings &s)
 {
+	if (!s.hlsLanAccess)
+		return "127.0.0.1";
 	for (const QHostAddress &addr : QNetworkInterface::allAddresses()) {
 		if (addr.protocol() == QAbstractSocket::IPv4Protocol && !addr.isLoopback())
 			return addr.toString();
@@ -246,12 +252,12 @@ static QString LanAddress()
 
 QString OutputsManager::WebPlayerUrl(const StationSettings &s) const
 {
-	return QString("http://%1:%2/").arg(LanAddress()).arg(s.hlsPort);
+	return QString("http://%1:%2/").arg(LanAddress(s)).arg(s.hlsPort);
 }
 
 QString OutputsManager::WebPlaylistUrl(const StationSettings &s) const
 {
-	return QString("http://%1:%2/live.m3u8").arg(LanAddress()).arg(s.hlsPort);
+	return QString("http://%1:%2/live.m3u8").arg(LanAddress(s)).arg(s.hlsPort);
 }
 
 } // namespace station

@@ -2,6 +2,7 @@
 
 #include <obs-module.h>
 
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -96,6 +97,9 @@ OutputsDialog::OutputsDialog(StationSettings &settings, OutputsManager &outputs,
 	hlsPort_->setRange(1024, 65535);
 	hlsPort_->setValue(settings.hlsPort);
 	wForm->addRow(T("Outputs.Port"), hlsPort_);
+	hlsLanAccess_ = new QCheckBox(T("Outputs.LanAccess"));
+	hlsLanAccess_->setChecked(settings.hlsLanAccess);
+	wForm->addRow(QString(), hlsLanAccess_);
 	playerUrl_ = LtrEdit("");
 	playerUrl_->setReadOnly(true);
 	wForm->addRow(T("Outputs.PlayerUrl"), playerUrl_);
@@ -150,6 +154,7 @@ void OutputsDialog::ApplyFields()
 	settings_.receiverUrl = receiverUrl_->text().trimmed().toStdString();
 	settings_.hlsFolder = hlsFolder_->text().trimmed().toStdString();
 	settings_.hlsPort = hlsPort_->value();
+	settings_.hlsLanAccess = hlsLanAccess_->isChecked();
 	settings_.youtubeServer = ytServer_->text().trimmed().toStdString();
 	settings_.youtubeKey = ytKey_->text().trimmed().toStdString();
 	settings_.facebookServer = fbServer_->text().trimmed().toStdString();

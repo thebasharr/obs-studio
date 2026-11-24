@@ -1,32 +1,32 @@
 #pragma once
 
-#include <QObject>
 #include <QString>
 
-class QTcpServer;
-class QTcpSocket;
+class QThread;
 
 namespace station {
 
-/* Minimal read-only HTTP server for the HLS folder plus an embeddable player
-   page. Serves only flat files with known extensions from one folder. */
-class HlsServer : public QObject {
-	Q_OBJECT
+class HlsWorker;
 
+/* Minimal read-only HTTP server for the HLS folder plus the bundled player
+   page. Serves only flat files with known names, runs on its own thread so
+   file reads never block the OBS UI, and drops idle or excess connections. */
+class HlsServer {
 public:
-	HlsServer();
-	~HlsServer() override;
+	HlsServer() = default;
+	~HlsServer();
 
-	bool Start(const QString &folder, quint16 port, QString &error);
+	HlsServer(const HlsServer &) = delete;
+	HlsServer &operator=(const HlsServer &) = delete;
+
+	/* `lanAccess` false binds to localhost only. */
+	bool Start(const QString &hlsFolder, const QString &playerFolder, quint16 port, bool lanAccess,
+		   QString &error);
 	void Stop();
 
 private:
-	void HandleClient(QTcpSocket *socket);
-	void Respond(QTcpSocket *socket, int status, const QByteArray &type, const QByteArray &body,
-		     bool noCache = true);
-
-	QTcpServer *server_ = nullptr;
-	QString folder_;
+	QThread *thread_ = nullptr;
+	HlsWorker *worker_ = nullptr;
 };
 
 } // namespace station

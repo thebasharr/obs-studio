@@ -78,6 +78,7 @@ bool LoadState(Schedule &schedule, StationSettings &s)
 	s.receiverUrl = GetStr(root, "receiver_url", def.receiverUrl);
 	s.hlsFolder = GetStr(root, "hls_folder", def.hlsFolder);
 	s.hlsPort = GetInt(root, "hls_port", def.hlsPort);
+	s.hlsLanAccess = GetBool(root, "hls_lan_access", def.hlsLanAccess);
 	s.youtubeServer = GetStr(root, "youtube_server", def.youtubeServer);
 	s.youtubeKey = GetStr(root, "youtube_key", def.youtubeKey);
 	s.facebookServer = GetStr(root, "facebook_server", def.facebookServer);
@@ -118,6 +119,7 @@ bool SaveState(const Schedule &schedule, const StationSettings &s)
 	obs_data_set_string(root, "receiver_url", s.receiverUrl.c_str());
 	obs_data_set_string(root, "hls_folder", s.hlsFolder.c_str());
 	obs_data_set_int(root, "hls_port", s.hlsPort);
+	obs_data_set_bool(root, "hls_lan_access", s.hlsLanAccess);
 	obs_data_set_string(root, "youtube_server", s.youtubeServer.c_str());
 	obs_data_set_string(root, "youtube_key", s.youtubeKey.c_str());
 	obs_data_set_string(root, "facebook_server", s.facebookServer.c_str());

@@ -21,6 +21,7 @@ struct StationSettings {
 
 	std::string hlsFolder;
 	int hlsPort = 8080;
+	bool hlsLanAccess = true; /* false: player reachable from this computer only */
 
 	std::string youtubeServer = "rtmp://a.rtmp.youtube.com/live2";
 	std::string youtubeKey;

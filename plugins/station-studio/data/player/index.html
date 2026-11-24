@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>البث المباشر</title>
+<style>
+html,body{margin:0;height:100%;background:#000;color:#fff;font-family:system-ui,sans-serif}
+video{width:100%;height:100%;object-fit:contain;background:#000}
+#msg{position:absolute;inset:auto 0 1rem 0;text-align:center;opacity:.8}
+</style>
+</head>
+<body>
+<video id="v" controls autoplay muted playsinline></video>
+<div id="msg"></div>
+<!-- hls.js 1.7.4 (Apache-2.0, see hls.js-LICENSE.txt), served locally so the
+     player works without internet access and loads no third-party code. -->
+<script src="hls.light.min.js"></script>
+<script>
+const v = document.getElementById('v');
+const msg = document.getElementById('msg');
+const src = 'live.m3u8';
+function start() {
+  if (v.canPlayType('application/vnd.apple.mpegurl')) { v.src = src; return; }
+  if (window.Hls && Hls.isSupported()) {
+    const hls = new Hls({ liveSyncDurationCount: 3 });
+    hls.loadSource(src);
+    hls.attachMedia(v);
+    hls.on(Hls.Events.ERROR, (_, d) => {
+      if (d.fatal) { msg.textContent = 'جارٍ إعادة الاتصال...'; setTimeout(() => { hls.destroy(); start(); }, 3000); }
+    });
+    hls.on(Hls.Events.MANIFEST_PARSED, () => { msg.textContent = ''; });
+    return;
+  }
+  msg.textContent = 'المتصفح لا يدعم تشغيل البث';
+}
+start();
+</script>
+</body>
+</html>

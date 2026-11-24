@@ -7,6 +7,7 @@
 
 #include <functional>
 
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -41,6 +42,7 @@ private:
 	QLineEdit *receiverUrl_;
 	QLineEdit *hlsFolder_;
 	QSpinBox *hlsPort_;
+	QCheckBox *hlsLanAccess_;
 	QLineEdit *playerUrl_;
 	QLineEdit *ytServer_;
 	QLineEdit *ytKey_;
